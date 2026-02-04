@@ -118,7 +118,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 433069397472e491ba2a90c4ca72e077, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  currentGrid: {fileID: 0}
-  moveSpeed: 5
-  arrowPrefab: {fileID: 0}
   playerId: 0
+  moveSpeed: 5
+  rotationSpeed: 10
+  heightOffset: 0.5
+  currentGrid: {fileID: 0}

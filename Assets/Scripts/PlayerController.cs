@@ -3,63 +3,81 @@ using System.Collections;
 using System.Collections.Generic;
 
 public class PlayerController : MonoBehaviour {
-    public GridNode currentGrid;
-    public float moveSpeed = 5f;
-    public GameObject arrowPrefab;
+    [Header("身份设置")]
     public int playerId;
-    private int lastInDir = -1;
+    
+    [Header("移动设置")]
+    public float moveSpeed = 5f;
+    public float rotationSpeed = 10f;
+    public float heightOffset = 0.5f; // 根据你的地板厚度调整此值
 
-    public void StartMove(int steps) { StartCoroutine(MoveRoutine(steps)); }
+    [Header("当前状态")]
+    public GridNode currentGrid;
+    private bool isMoving = false;
 
-    private IEnumerator MoveRoutine(int steps) {
-        int fuel = steps;
-        while (fuel > 0) {
-            List<int> available = new List<int>();
-            int backDir = (lastInDir != -1) ? GridNode.GetOppositeDirection(lastInDir) : -1;
-            for (int i = 0; i < 4; i++) {
-                if (currentGrid.connections[i] != null && i != backDir) available.Add(i);
-            }
-
-            int chosen = -1;
-            if (available.Count == 0) {
-                if (backDir != -1 && currentGrid.connections[backDir] != null) chosen = backDir;
-                else break;
-            } else if (available.Count == 1) {
-                chosen = available[0];
-            } else {
-                yield return StartCoroutine(ShowArrows(available, (res) => chosen = res));
-            }
-
-            if (chosen != -1) {
-                currentGrid.RemovePlayer(gameObject);
-                GridNode next = currentGrid.connections[chosen];
-                lastInDir = chosen;
-                Vector3 target = next.GetSlotPosition(gameObject);
-                transform.LookAt(target);
-                
-                float t = 0;
-                Vector3 start = transform.position;
-                while (t < 1f) {
-                    t += Time.deltaTime * moveSpeed;
-                    transform.position = Vector3.Lerp(start, target, t);
-                    yield return null;
-                }
-                currentGrid = next;
-                fuel--;
-            }
-        }
+    // 辅助方法：统一计算带高度的位置
+    public Vector3 GetPosWithHeight(Vector3 basePos) {
+        return new Vector3(basePos.x, basePos.y + heightOffset, basePos.z);
     }
 
-    private IEnumerator ShowArrows(List<int> dirs, System.Action<int> callback) {
-        int selected = -1;
-        List<GameObject> arrows = new List<GameObject>();
-        foreach (int d in dirs) {
-            GameObject a = Instantiate(arrowPrefab, transform.position + Vector3.up * 1f, Quaternion.Euler(0, d * 90f, 0));
-            a.AddComponent<ArrowButton>().onClicked = () => selected = d;
-            arrows.Add(a);
+    // 初始化位置（在 GameStartManager 实例化时调用）
+    public void SetInitialPosition(GridNode node) {
+        currentGrid = node;
+        // 获取 Slot 位置后立即叠加高度偏移
+        Vector3 slotPos = node.GetSlotPosition(this.gameObject);
+        transform.position = GetPosWithHeight(slotPos);
+    }
+
+    // 由 TurnManager 调用开启移动
+    public void StartMoving(int steps, System.Action onComplete) {
+        StartCoroutine(MoveRoutine(steps, onComplete));
+    }
+
+    private IEnumerator MoveRoutine(int steps, System.Action onComplete) {
+        int remainingSteps = steps;
+        while (remainingSteps > 0) {
+            isMoving = true;
+            GridNode nextNode = DetermineNextNode();
+
+            if (nextNode == null) {
+                Debug.Log("前面没路了！");
+                break;
+            }
+
+            yield return StartCoroutine(MoveToNode(nextNode));
+
+            currentGrid = nextNode;
+            remainingSteps--;
+            yield return new WaitForSeconds(0.1f);
         }
-        while (selected == -1) yield return null;
-        foreach (var a in arrows) Destroy(a);
-        callback(selected);
+        isMoving = false;
+        onComplete?.Invoke();
+    }
+
+    private IEnumerator MoveToNode(GridNode targetNode) {
+        Vector3 targetPos = GetPosWithHeight(targetNode.GetSlotPosition(this.gameObject));
+        
+        while (Vector3.Distance(transform.position, targetPos) > 0.01f) {
+            // 位移
+            transform.position = Vector3.MoveTowards(transform.position, targetPos, moveSpeed * Time.deltaTime);
+            
+            // 转向
+            Vector3 dir = (targetPos - transform.position).normalized;
+            if (dir != Vector3.zero) {
+                Quaternion targetRot = Quaternion.LookRotation(dir);
+                transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, rotationSpeed * Time.deltaTime);
+            }
+            yield return null;
+        }
+        transform.position = targetPos;
+    }
+
+    private GridNode DetermineNextNode() {
+        if (currentGrid == null) return null;
+        // 简单逻辑：取第一个非空连接。未来这里会加入分叉路口判断
+        foreach (var node in currentGrid.connections) {
+            if (node != null) return node;
+        }
+        return null;
     }
 }
