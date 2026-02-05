@@ -9,9 +9,20 @@ public class PlayerController : MonoBehaviour {
     public float heightOffset = 0.5f; 
     public GameObject arrowPrefab; 
 
+    [Header("资产属性")]
+    public int money = 5000;
+    public List<string> inventoryCards = new List<string>(); // 存储卡牌 ID
+
     public GridNode currentGrid;
     private GridNode lastGrid; 
     private GridNode chosenNode = null;
+
+    public void ChangeMoney(int amount) {
+        money += amount;
+        if (UIManager.Instance != null) {
+            UIManager.Instance.UpdatePlayerStats(this);
+        }
+    }
 
     public void SetInitialPosition(GridNode node) {
         currentGrid = node;
@@ -34,7 +45,6 @@ public class PlayerController : MonoBehaviour {
 
             GridNode nextNode = null;
             if (validOptions.Count > 1) {
-                // 进入分叉路口选择
                 yield return StartCoroutine(WaitForBranchSelection(validOptions, (selected) => nextNode = selected));
             } else if (validOptions.Count == 1) {
                 nextNode = validOptions[0];
@@ -54,19 +64,13 @@ public class PlayerController : MonoBehaviour {
     private IEnumerator WaitForBranchSelection(List<GridNode> options, System.Action<GridNode> onSelected) {
         List<GameObject> activeArrows = new List<GameObject>();
         chosenNode = null;
-
-        // 新增：在 UI 上显示选择提醒
-        if (UIManager.Instance != null) {
-            UIManager.Instance.UpdateStatus("请点击箭头选择前进方向");
-        }
+        if (UIManager.Instance != null) UIManager.Instance.UpdateStatus("请选择分支路口前进方向");
 
         foreach (var node in options) {
             Vector3 diff = node.transform.position - currentGrid.transform.position;
             Quaternion fixedRotation = Quaternion.identity;
             Vector3 offset = Vector3.zero;
             float dist = 1.3f;
-
-            // 固定 X/Z 轴朝向逻辑
             if (Mathf.Abs(diff.x) > Mathf.Abs(diff.z)) {
                 if (diff.x > 0) { fixedRotation = Quaternion.Euler(0, 90, 0); offset = new Vector3(dist, 0, 0); }
                 else { fixedRotation = Quaternion.Euler(0, -90, 0); offset = new Vector3(-dist, 0, 0); }
@@ -74,18 +78,14 @@ public class PlayerController : MonoBehaviour {
                 if (diff.z > 0) { fixedRotation = Quaternion.Euler(0, 0, 0); offset = new Vector3(0, 0, dist); }
                 else { fixedRotation = Quaternion.Euler(0, 180, 0); offset = new Vector3(0, 0, -dist); }
             }
-
             Vector3 spawnPos = currentGrid.transform.position + Vector3.up * 0.7f + offset;
             GameObject arrow = Instantiate(arrowPrefab, spawnPos, fixedRotation);
             arrow.transform.Rotate(90, 0, 0, Space.Self); 
-
             ArrowClicker clicker = arrow.GetComponent<ArrowClicker>() ?? arrow.AddComponent<ArrowClicker>();
             clicker.Setup(node, (target) => chosenNode = target);
             activeArrows.Add(arrow);
         }
-
         while (chosenNode == null) yield return null;
-        
         foreach (var arrow in activeArrows) Destroy(arrow);
         onSelected?.Invoke(chosenNode);
     }

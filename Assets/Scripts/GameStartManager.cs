@@ -14,6 +14,11 @@ public class GameStartManager : MonoBehaviour {
 
     void Start() {
         if (gridDatabase) gridDatabase.CleanUp();
+        
+        // 1. 初始化时隐藏除 Status 外的所有 UI
+        UIManager.Instance.SetExtraButtonsVisible(false);
+        UIManager.Instance.SetPlayerStatsVisible(false);
+        
         InitPlayers();
         StartCoroutine(MainFlow());
     }
@@ -43,10 +48,9 @@ public class GameStartManager : MonoBehaviour {
 
     IEnumerator HandleLocalRoll() {
         int result = Random.Range(1, 7);
-        yield return StartCoroutine(diceAnimator.PlayRollSequence(result, () => {
-            rollResults[1] = result;
-            CheckStatus();
-        }));
+        yield return StartCoroutine(diceAnimator.PlayRollSequence(result, null));
+        rollResults[1] = result;
+        CheckStatus();
     }
 
     IEnumerator SimulateOthersRoll() {
@@ -59,7 +63,6 @@ public class GameStartManager : MonoBehaviour {
 
     void CheckStatus() {
         if (rollResults.Count >= 6) {
-            var sorted = players.OrderByDescending(p => rollResults[p.playerId]).ToList();
             UIManager.Instance.UpdateStatus("顺序已定，游戏开始！");
             Invoke("ToTurnManager", 2f);
         } else {
@@ -69,7 +72,8 @@ public class GameStartManager : MonoBehaviour {
 
     void ToTurnManager() {
         var sorted = players.OrderByDescending(p => rollResults[p.playerId]).ToList();
+        // 切换到正式游戏逻辑，TurnManager 会负责重新开启 UI
         TurnManager.Instance.BeginGame(sorted);
-        this.gameObject.SetActive(false);
+        this.gameObject.SetActive(false); 
     }
 }

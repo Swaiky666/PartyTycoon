@@ -156,6 +156,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridId: 1
   type: 0
+  purchasePrice: 500
+  rentPrice: 200
+  owner: {fileID: 0}
   connections:
   - {fileID: 0}
   - {fileID: 1591563368}
@@ -985,6 +988,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridId: 21
   type: 0
+  purchasePrice: 500
+  rentPrice: 200
+  owner: {fileID: 0}
   connections:
   - {fileID: 911139906}
   - {fileID: 0}
@@ -1276,6 +1282,7 @@ Transform:
   - {fileID: 1671034272}
   - {fileID: 1118936351}
   - {fileID: 871811952}
+  - {fileID: 1485115124}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &238260863
@@ -1705,6 +1712,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridId: 33
   type: 0
+  purchasePrice: 500
+  rentPrice: 200
+  owner: {fileID: 0}
   connections:
   - {fileID: 0}
   - {fileID: 1540663673}
@@ -1884,6 +1894,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridId: 5
   type: 0
+  purchasePrice: 500
+  rentPrice: 200
+  owner: {fileID: 0}
   connections:
   - {fileID: 0}
   - {fileID: 0}
@@ -2022,6 +2035,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridId: 12
   type: 0
+  purchasePrice: 500
+  rentPrice: 200
+  owner: {fileID: 0}
   connections:
   - {fileID: 0}
   - {fileID: 0}
@@ -2408,6 +2424,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridId: 10
   type: 0
+  purchasePrice: 500
+  rentPrice: 200
+  owner: {fileID: 0}
   connections:
   - {fileID: 2001663857}
   - {fileID: 0}
@@ -3042,6 +3061,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridId: 24
   type: 0
+  purchasePrice: 500
+  rentPrice: 200
+  owner: {fileID: 0}
   connections:
   - {fileID: 801354527}
   - {fileID: 0}
@@ -3189,7 +3211,7 @@ GameObject:
   - component: {fileID: 632099714}
   - component: {fileID: 632099713}
   m_Layer: 5
-  m_Name: statusText
+  m_Name: MainStatusText
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -3234,7 +3256,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: New Text
+  m_text: MainStatusText
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: fa3d6bc0bc1524b51aaf4f3f8ac7a356, type: 2}
   m_sharedMaterial: {fileID: 878659092400840005, guid: fa3d6bc0bc1524b51aaf4f3f8ac7a356, type: 2}
@@ -3624,6 +3646,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridId: 3
   type: 0
+  purchasePrice: 500
+  rentPrice: 200
+  owner: {fileID: 0}
   connections:
   - {fileID: 1261981075}
   - {fileID: 0}
@@ -4651,6 +4676,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridId: 25
   type: 0
+  purchasePrice: 500
+  rentPrice: 200
+  owner: {fileID: 0}
   connections:
   - {fileID: 1201938095}
   - {fileID: 1751114626}
@@ -5017,6 +5045,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   globalStatusText: {fileID: 632099713}
+  playerStatsText: {fileID: 2139740532}
   actionButton: {fileID: 1725389757}
   viewButton: {fileID: 118166866}
   cardButton: {fileID: 1029890458}
@@ -5230,6 +5259,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridId: 20
   type: 0
+  purchasePrice: 500
+  rentPrice: 200
+  owner: {fileID: 0}
   connections:
   - {fileID: 1462789244}
   - {fileID: 0}
@@ -5409,6 +5441,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridId: 16
   type: 0
+  purchasePrice: 500
+  rentPrice: 200
+  owner: {fileID: 0}
   connections:
   - {fileID: 0}
   - {fileID: 1880353645}
@@ -5677,6 +5712,8 @@ MonoBehaviour:
   target: {fileID: 0}
   followSmoothTime: 0.3
   rotationSpeed: 1
+  zoomSpeed: 0.5
+  panRange: 15
 --- !u!1 &965502389
 GameObject:
   m_ObjectHideFlags: 0
@@ -6319,6 +6356,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridId: 32
   type: 0
+  purchasePrice: 500
+  rentPrice: 200
+  owner: {fileID: 0}
   connections:
   - {fileID: 0}
   - {fileID: 370984605}
@@ -6488,6 +6528,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridId: 29
   type: 0
+  purchasePrice: 500
+  rentPrice: 200
+  owner: {fileID: 0}
   connections:
   - {fileID: 1941667383}
   - {fileID: 1101050643}
@@ -6657,6 +6700,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridId: 28
   type: 0
+  purchasePrice: 500
+  rentPrice: 200
+  owner: {fileID: 0}
   connections:
   - {fileID: 0}
   - {fileID: 1227372591}
@@ -6964,6 +7010,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridId: 23
   type: 0
+  purchasePrice: 500
+  rentPrice: 200
+  owner: {fileID: 0}
   connections:
   - {fileID: 0}
   - {fileID: 608232685}
@@ -7164,6 +7213,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridId: 9
   type: 0
+  purchasePrice: 500
+  rentPrice: 200
+  owner: {fileID: 0}
   connections:
   - {fileID: 500621652}
   - {fileID: 0}
@@ -7395,6 +7447,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridId: 22
   type: 0
+  purchasePrice: 500
+  rentPrice: 200
+  owner: {fileID: 0}
   connections:
   - {fileID: 162607556}
   - {fileID: 1123167489}
@@ -7626,6 +7681,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridId: 17
   type: 0
+  purchasePrice: 500
+  rentPrice: 200
+  owner: {fileID: 0}
   connections:
   - {fileID: 1924288260}
   - {fileID: 0}
@@ -7764,6 +7822,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridId: 26
   type: 0
+  purchasePrice: 500
+  rentPrice: 200
+  owner: {fileID: 0}
   connections:
   - {fileID: 1880353645}
   - {fileID: 0}
@@ -8109,6 +8170,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridId: 27
   type: 0
+  purchasePrice: 500
+  rentPrice: 200
+  owner: {fileID: 0}
   connections:
   - {fileID: 0}
   - {fileID: 1165946117}
@@ -8278,6 +8342,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridId: 4
   type: 0
+  purchasePrice: 500
+  rentPrice: 200
+  owner: {fileID: 0}
   connections:
   - {fileID: 398738720}
   - {fileID: 0}
@@ -9107,6 +9174,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridId: 23
   type: 0
+  purchasePrice: 500
+  rentPrice: 200
+  owner: {fileID: 0}
   connections:
   - {fileID: 1616433107}
   - {fileID: 943726420}
@@ -9181,6 +9251,50 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1880353649}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1485115123
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1485115124}
+  - component: {fileID: 1485115125}
+  m_Layer: 0
+  m_Name: GridEventManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1485115124
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1485115123}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 228669090}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1485115125
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1485115123}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c8e8274f498db4a2ea875f7da58aadc8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1517270454
 GameObject:
   m_ObjectHideFlags: 0
@@ -9401,6 +9515,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridId: 18
   type: 0
+  purchasePrice: 500
+  rentPrice: 200
+  owner: {fileID: 0}
   connections:
   - {fileID: 0}
   - {fileID: 1462789244}
@@ -9827,6 +9944,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridId: 2
   type: 0
+  purchasePrice: 500
+  rentPrice: 200
+  owner: {fileID: 0}
   connections:
   - {fileID: 0}
   - {fileID: 692353299}
@@ -10089,6 +10209,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridId: 19
   type: 0
+  purchasePrice: 500
+  rentPrice: 200
+  owner: {fileID: 0}
   connections:
   - {fileID: 1195927445}
   - {fileID: 0}
@@ -10320,6 +10443,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridId: 7
   type: 0
+  purchasePrice: 500
+  rentPrice: 200
+  owner: {fileID: 0}
   connections:
   - {fileID: 1803816479}
   - {fileID: 0}
@@ -10794,6 +10920,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridId: 8
   type: 0
+  purchasePrice: 500
+  rentPrice: 200
+  owner: {fileID: 0}
   connections:
   - {fileID: 0}
   - {fileID: 1658427938}
@@ -11149,6 +11278,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridId: 6
   type: 0
+  purchasePrice: 500
+  rentPrice: 200
+  owner: {fileID: 0}
   connections:
   - {fileID: 1591563368}
   - {fileID: 0}
@@ -11566,6 +11698,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridId: 1
   type: 0
+  purchasePrice: 500
+  rentPrice: 200
+  owner: {fileID: 0}
   connections:
   - {fileID: 1149594013}
   - {fileID: 35521945}
@@ -11797,6 +11932,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridId: 14
   type: 0
+  purchasePrice: 500
+  rentPrice: 200
+  owner: {fileID: 0}
   connections:
   - {fileID: 0}
   - {fileID: 1954918885}
@@ -12059,6 +12197,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridId: 15
   type: 0
+  purchasePrice: 500
+  rentPrice: 200
+  owner: {fileID: 0}
   connections:
   - {fileID: 1898150449}
   - {fileID: 0}
@@ -12259,6 +12400,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridId: 30
   type: 0
+  purchasePrice: 500
+  rentPrice: 200
+  owner: {fileID: 0}
   connections:
   - {fileID: 2069545256}
   - {fileID: 0}
@@ -12428,6 +12572,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridId: 13
   type: 0
+  purchasePrice: 500
+  rentPrice: 200
+  owner: {fileID: 0}
   connections:
   - {fileID: 0}
   - {fileID: 400849113}
@@ -12659,6 +12806,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridId: 11
   type: 0
+  purchasePrice: 500
+  rentPrice: 200
+  owner: {fileID: 0}
   connections:
   - {fileID: 400849113}
   - {fileID: 0}
@@ -12890,6 +13040,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gridId: 31
   type: 0
+  purchasePrice: 500
+  rentPrice: 200
+  owner: {fileID: 0}
   connections:
   - {fileID: 1067894142}
   - {fileID: 0}
@@ -13090,6 +13243,7 @@ RectTransform:
   - {fileID: 118166865}
   - {fileID: 1029890457}
   - {fileID: 632099712}
+  - {fileID: 2139740531}
   m_Father: {fileID: 1585320819}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -13166,6 +13320,140 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1898150453}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &2139740530
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2139740531}
+  - component: {fileID: 2139740533}
+  - component: {fileID: 2139740532}
+  m_Layer: 5
+  m_Name: PlayerStatusText
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &2139740531
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2139740530}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2128313200}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: -259, y: 626}
+  m_SizeDelta: {x: 200, y: 50}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &2139740532
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2139740530}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_text: PlayerStatusText
+  m_isRightToLeft: 0
+  m_fontAsset: {fileID: 11400000, guid: fa3d6bc0bc1524b51aaf4f3f8ac7a356, type: 2}
+  m_sharedMaterial: {fileID: 878659092400840005, guid: fa3d6bc0bc1524b51aaf4f3f8ac7a356, type: 2}
+  m_fontSharedMaterials: []
+  m_fontMaterial: {fileID: 0}
+  m_fontMaterials: []
+  m_fontColor32:
+    serializedVersion: 2
+    rgba: 4294967295
+  m_fontColor: {r: 1, g: 1, b: 1, a: 1}
+  m_enableVertexGradient: 0
+  m_colorMode: 3
+  m_fontColorGradient:
+    topLeft: {r: 1, g: 1, b: 1, a: 1}
+    topRight: {r: 1, g: 1, b: 1, a: 1}
+    bottomLeft: {r: 1, g: 1, b: 1, a: 1}
+    bottomRight: {r: 1, g: 1, b: 1, a: 1}
+  m_fontColorGradientPreset: {fileID: 0}
+  m_spriteAsset: {fileID: 0}
+  m_tintAllSprites: 0
+  m_StyleSheet: {fileID: 0}
+  m_TextStyleHashCode: -1183493901
+  m_overrideHtmlColors: 0
+  m_faceColor:
+    serializedVersion: 2
+    rgba: 4294967295
+  m_fontSize: 32
+  m_fontSizeBase: 32
+  m_fontWeight: 400
+  m_enableAutoSizing: 0
+  m_fontSizeMin: 18
+  m_fontSizeMax: 72
+  m_fontStyle: 0
+  m_HorizontalAlignment: 2
+  m_VerticalAlignment: 256
+  m_textAlignment: 65535
+  m_characterSpacing: 0
+  m_wordSpacing: 0
+  m_lineSpacing: 0
+  m_lineSpacingMax: 0
+  m_paragraphSpacing: 0
+  m_charWidthMaxAdj: 0
+  m_enableWordWrapping: 1
+  m_wordWrappingRatios: 0.4
+  m_overflowMode: 0
+  m_linkedTextComponent: {fileID: 0}
+  parentLinkedComponent: {fileID: 0}
+  m_enableKerning: 1
+  m_enableExtraPadding: 0
+  checkPaddingRequired: 0
+  m_isRichText: 1
+  m_parseCtrlCharacters: 1
+  m_isOrthographic: 1
+  m_isCullingEnabled: 0
+  m_horizontalMapping: 0
+  m_verticalMapping: 0
+  m_uvLineOffset: 0
+  m_geometrySortingOrder: 0
+  m_IsTextObjectScaleStatic: 0
+  m_VertexBufferAutoSizeReduction: 0
+  m_useMaxVisibleDescender: 1
+  m_pageToDisplay: 1
+  m_margin: {x: 0, y: 0, z: 0, w: 0}
+  m_isUsingLegacyAnimationComponent: 0
+  m_isVolumetricText: 0
+  m_hasFontAssetChanged: 0
+  m_baseMaterial: {fileID: 0}
+  m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!222 &2139740533
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2139740530}
+  m_CullTransparentMesh: 1
 --- !u!1 &2144285731
 GameObject:
   m_ObjectHideFlags: 0

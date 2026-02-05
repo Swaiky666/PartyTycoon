@@ -12,10 +12,13 @@ public class CameraController : MonoBehaviour {
     public float rotationSpeed = 0.15f;
     public float zoomSpeed = 0.5f;
 
+    [Header("自由模式限制")]
+    public float panRange = 15f; // 在 Inspector 中更改此数值限制移动范围
+
     private float currentDistance = 12f;
     private float targetDistance = 12f;
     private float yaw = 0f;
-    private float pitch = 40f; // 默认跟随俯角
+    private float pitch = 40f; 
 
     private Vector3 currentVelocity;
     private Vector3 smoothPivotPoint;
@@ -41,16 +44,13 @@ public class CameraController : MonoBehaviour {
         UpdatePosition();
     }
 
-    // 关键修正：模式切换
     public void SetFreeMode(bool free) {
         isFreeMode = free;
         if (free) {
-            // 进入俯视角：俯角90度直视下方，偏航角归零
             pitch = 90f;
             yaw = 0f;
             lastMousePos = Input.mousePosition;
         } else {
-            // 切回跟随视角：恢复默认的俯视角和偏移量
             pitch = 40f;
             freePivotOffset = Vector3.zero;
         }
@@ -71,13 +71,12 @@ public class CameraController : MonoBehaviour {
         }
         if (Input.GetMouseButtonUp(0) || (Input.touchCount == 1 && Input.GetTouch(0).phase == TouchPhase.Ended)) isOrbiting = false;
 
-        // 仅在非自由模式下允许旋转视角
         if (isOrbiting && !isFreeMode) {
             float mouseX = (Input.touchCount > 0) ? Input.GetTouch(0).deltaPosition.x : Input.GetAxis("Mouse X") * 10f;
             float mouseY = (Input.touchCount > 0) ? Input.GetTouch(0).deltaPosition.y : Input.GetAxis("Mouse Y") * 10f;
             yaw += mouseX * rotationSpeed;
             pitch -= mouseY * rotationSpeed;
-            pitch = Mathf.Clamp(pitch, 10f, 85f); // 俯视角不宜超过90度，防止死锁
+            pitch = Mathf.Clamp(pitch, 10f, 85f);
         }
     }
 
@@ -86,10 +85,13 @@ public class CameraController : MonoBehaviour {
         Vector3 delta = currentMousePos - lastMousePos;
         lastMousePos = currentMousePos;
 
-        // 俯视图下的移动逻辑：鼠标向上划 -> 相机向前移
-        // 此时相机正对着地面，所以平移非常直观
-        Vector3 panDir = new Vector3(-delta.x, 0, -delta.y); // 根据实际感官调整正负号
-        freePivotOffset += panDir * 0.015f * (currentDistance / 10f);
+        Vector3 panDir = new Vector3(-delta.x, 0, -delta.y);
+        
+        // 计算新的偏移量
+        Vector3 nextOffset = freePivotOffset + panDir * 0.015f * (currentDistance / 10f);
+        
+        // 关键逻辑：限制偏移向量的模长，使其不超出 panRange
+        freePivotOffset = Vector3.ClampMagnitude(nextOffset, panRange);
     }
 
     void UpdatePosition() {
@@ -102,6 +104,7 @@ public class CameraController : MonoBehaviour {
     }
 
     public void SetTarget(Transform newTarget) { target = newTarget; }
+
     private bool IsPointerOverUI() {
         if (EventSystem.current == null) return false;
         return EventSystem.current.IsPointerOverGameObject() || (Input.touchCount > 0 && EventSystem.current.IsPointerOverGameObject(Input.GetTouch(0).fingerId));

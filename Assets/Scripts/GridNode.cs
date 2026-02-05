@@ -8,6 +8,11 @@ public class GridNode : MonoBehaviour {
     public int gridId = -1; 
     public GridType type;
 
+    [Header("土地经济")]
+    public int purchasePrice = 500; 
+    public int rentPrice = 200;
+    public PlayerController owner = null; // 当前土地的主人
+
     [Header("四向连接 (0:北, 1:东, 2:南, 3:西)")]
     public GridNode[] connections = new GridNode[4]; 
 
@@ -33,7 +38,6 @@ public class GridNode : MonoBehaviour {
             if (connections[i] != null) {
                 Gizmos.color = dirColors[i];
                 Gizmos.DrawLine(transform.position, connections[i].transform.position);
-                Gizmos.DrawSphere(Vector3.Lerp(transform.position, connections[i].transform.position, 0.2f), 0.15f);
             }
         }
     }
