@@ -8,17 +8,23 @@ public class CameraController : MonoBehaviour {
     public Transform target;
     public float followSmoothTime = 0.2f;
 
-    [Header("控制感度")]
+    [Header("旋转/缩放感度")]
     public float rotationSpeed = 0.15f;
     public float zoomSpeed = 0.5f;
 
     private float currentDistance = 12f;
     private float targetDistance = 12f;
     private float yaw = 0f;
-    private float pitch = 40f;
+    private float pitch = 40f; // 默认跟随俯角
+
     private Vector3 currentVelocity;
     private Vector3 smoothPivotPoint;
     private bool isOrbiting = false;
+
+    // --- 自由平移变量 ---
+    private bool isFreeMode = false;
+    private Vector3 freePivotOffset; 
+    private Vector3 lastMousePos;
 
     void Awake() { Instance = this; }
 
@@ -27,7 +33,27 @@ public class CameraController : MonoBehaviour {
         
         HandleZoom();
         HandleRotation();
+        
+        if (isFreeMode && isOrbiting) {
+            HandleFreePan();
+        }
+
         UpdatePosition();
+    }
+
+    // 关键修正：模式切换
+    public void SetFreeMode(bool free) {
+        isFreeMode = free;
+        if (free) {
+            // 进入俯视角：俯角90度直视下方，偏航角归零
+            pitch = 90f;
+            yaw = 0f;
+            lastMousePos = Input.mousePosition;
+        } else {
+            // 切回跟随视角：恢复默认的俯视角和偏移量
+            pitch = 40f;
+            freePivotOffset = Vector3.zero;
+        }
     }
 
     void HandleZoom() {
@@ -37,40 +63,47 @@ public class CameraController : MonoBehaviour {
     }
 
     void HandleRotation() {
-        // 关键点：只要不点在 UI 上，点击屏幕任何地方（包括空白和箭头）都能触发旋转判定
         if (Input.GetMouseButtonDown(0) || (Input.touchCount == 1 && Input.GetTouch(0).phase == TouchPhase.Began)) {
             if (!IsPointerOverUI()) {
                 isOrbiting = true;
+                lastMousePos = Input.mousePosition;
             }
         }
+        if (Input.GetMouseButtonUp(0) || (Input.touchCount == 1 && Input.GetTouch(0).phase == TouchPhase.Ended)) isOrbiting = false;
 
-        if (Input.GetMouseButtonUp(0) || (Input.touchCount == 1 && Input.GetTouch(0).phase == TouchPhase.Ended)) {
-            isOrbiting = false;
-        }
-
-        if (isOrbiting) {
+        // 仅在非自由模式下允许旋转视角
+        if (isOrbiting && !isFreeMode) {
             float mouseX = (Input.touchCount > 0) ? Input.GetTouch(0).deltaPosition.x : Input.GetAxis("Mouse X") * 10f;
             float mouseY = (Input.touchCount > 0) ? Input.GetTouch(0).deltaPosition.y : Input.GetAxis("Mouse Y") * 10f;
-            
             yaw += mouseX * rotationSpeed;
             pitch -= mouseY * rotationSpeed;
-            pitch = Mathf.Clamp(pitch, 10f, 80f);
+            pitch = Mathf.Clamp(pitch, 10f, 85f); // 俯视角不宜超过90度，防止死锁
         }
+    }
+
+    void HandleFreePan() {
+        Vector3 currentMousePos = Input.mousePosition;
+        Vector3 delta = currentMousePos - lastMousePos;
+        lastMousePos = currentMousePos;
+
+        // 俯视图下的移动逻辑：鼠标向上划 -> 相机向前移
+        // 此时相机正对着地面，所以平移非常直观
+        Vector3 panDir = new Vector3(-delta.x, 0, -delta.y); // 根据实际感官调整正负号
+        freePivotOffset += panDir * 0.015f * (currentDistance / 10f);
     }
 
     void UpdatePosition() {
-        smoothPivotPoint = Vector3.SmoothDamp(smoothPivotPoint, target.position, ref currentVelocity, followSmoothTime);
+        Vector3 targetPoint = target.position + freePivotOffset;
+        smoothPivotPoint = Vector3.SmoothDamp(smoothPivotPoint, targetPoint, ref currentVelocity, followSmoothTime);
+        
         Quaternion rotation = Quaternion.Euler(pitch, yaw, 0);
         transform.position = smoothPivotPoint + rotation * new Vector3(0, 0, -currentDistance);
-        transform.LookAt(smoothPivotPoint + Vector3.up * 1.5f);
+        transform.LookAt(smoothPivotPoint + (isFreeMode ? Vector3.zero : Vector3.up * 1.5f));
     }
 
     public void SetTarget(Transform newTarget) { target = newTarget; }
-
     private bool IsPointerOverUI() {
         if (EventSystem.current == null) return false;
-        // 检测鼠标或手指是否在 UI 物体上
-        return EventSystem.current.IsPointerOverGameObject() || 
-               (Input.touchCount > 0 && EventSystem.current.IsPointerOverGameObject(Input.GetTouch(0).fingerId));
+        return EventSystem.current.IsPointerOverGameObject() || (Input.touchCount > 0 && EventSystem.current.IsPointerOverGameObject(Input.GetTouch(0).fingerId));
     }
 }
