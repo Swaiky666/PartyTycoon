@@ -122,4 +122,5 @@ MonoBehaviour:
   moveSpeed: 5
   rotationSpeed: 10
   heightOffset: 0.5
+  arrowPrefab: {fileID: 5427742095911369991, guid: 9002fc4049e814d89bf56ff011d729d0, type: 3}
   currentGrid: {fileID: 0}
