@@ -11,7 +11,7 @@ public class GridNode : MonoBehaviour {
     [Header("土地经济")]
     public int purchasePrice = 500; 
     public int rentPrice = 200;
-    public PlayerController owner = null; // 当前土地的主人
+    public PlayerController owner = null;
 
     [Header("四向连接 (0:北, 1:东, 2:南, 3:西)")]
     public GridNode[] connections = new GridNode[4]; 
@@ -19,6 +19,19 @@ public class GridNode : MonoBehaviour {
     [Header("6人站位锚点")]
     public Transform[] slotPoints = new Transform[6];
     private List<GameObject> playersInGrid = new List<GameObject>();
+
+    // --- 新增：路障运行时引用 ---
+    [Header("运行时状态")]
+    public GameObject currentBarricade; 
+
+    public bool HasBarricade() => currentBarricade != null;
+
+    public void ClearBarricade() {
+        if (currentBarricade != null) {
+            Destroy(currentBarricade);
+            currentBarricade = null;
+        }
+    }
 
     public static int GetOppositeDirection(int dir) { return (dir + 2) % 4; }
 

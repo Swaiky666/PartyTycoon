@@ -3,28 +3,21 @@ using System.Collections;
 using System.Collections.Generic;
 
 public class PlayerController : MonoBehaviour {
+    // ... (保持原有变量声明不变)
     public int playerId;
     public float moveSpeed = 5f;
     public float rotationSpeed = 10f;
     public float heightOffset = 0.5f; 
     public GameObject arrowPrefab; 
-
-    [Header("资产与默认卡牌")]
     public int money = 5000;
-    public List<CardBase> startingCards = new List<CardBase>(); // Inspector中设置
-
-    // 运行时实际持有的卡牌实例
+    public List<CardBase> startingCards = new List<CardBase>();
     [HideInInspector] public List<CardBase> cards = new List<CardBase>(); 
-
     public GridNode currentGrid;
     private GridNode lastGrid; 
     private GridNode chosenNode = null;
 
     void Awake() {
-        // 初始化默认卡牌
-        foreach (var c in startingCards) {
-            if (c != null) cards.Add(Instantiate(c));
-        }
+        foreach (var c in startingCards) if (c != null) cards.Add(Instantiate(c));
     }
 
     public void ChangeMoney(int amount) {
@@ -63,12 +56,21 @@ public class PlayerController : MonoBehaviour {
                 yield return StartCoroutine(MoveToNode(nextNode));
                 currentGrid = nextNode;
                 remainingSteps--;
+
+                // --- 新增：路障检测逻辑 ---
+                if (currentGrid.HasBarricade()) {
+                    Debug.Log("踩回路障，移动停止！");
+                    currentGrid.ClearBarricade(); // 销毁路障物理表现
+                    remainingSteps = 0; // 清空步数，强制结束循环
+                    break;
+                }
             } else break;
             yield return new WaitForSeconds(0.1f);
         }
         onComplete?.Invoke();
     }
 
+    // ... (保持 WaitForBranchSelection, MoveToNode 等其余代码不变)
     private IEnumerator WaitForBranchSelection(List<GridNode> options, System.Action<GridNode> onSelected) {
         List<GameObject> activeArrows = new List<GameObject>();
         chosenNode = null;
