@@ -86,7 +86,7 @@ public class TurnManager : MonoBehaviour {
 
             // 1. 进入卡牌模式
             UIManager.Instance.HideActionButton(); 
-            UIManager.Instance.SetCardButtonLabel("返回游戏"); // 改变按钮文案
+            UIManager.Instance.SetCardButtonLabel("返回"); // 改变按钮文案
             
             // 2. 禁用相机，防止拖拽干扰
             if (CameraController.Instance != null) CameraController.Instance.enabled = false;
@@ -113,7 +113,7 @@ public class TurnManager : MonoBehaviour {
 
         isInFreeView = !isInFreeView;
         CameraController.Instance.SetFreeMode(isInFreeView);
-        UIManager.Instance.SetViewButtonLabel(isInFreeView ? "返回跟随" : "自由俯视");
+        UIManager.Instance.SetViewButtonLabel(isInFreeView ? "返回" : "自由俯视");
         
         UIManager.Instance.cardButton.gameObject.SetActive(!isInFreeView);
         UIManager.Instance.actionButton.gameObject.SetActive(!isInFreeView);

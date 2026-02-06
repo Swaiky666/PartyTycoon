@@ -4977,8 +4977,9 @@ MonoBehaviour:
   cardUIPanel: {fileID: 1142301787}
   contentHolder: {fileID: 132546992}
   cardPrefab: {fileID: 3193726809298855494, guid: d85c3130c29434b2da4e103cf9879ec7, type: 3}
+  backButtonText: {fileID: 0}
   cardWidth: 600
-  cardHeight: 900
+  cardHeight: 1050
   cardSpacing: 200
   lerpSpeed: 10
 --- !u!1 &838189551
@@ -7288,7 +7289,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: -82}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1142301789
@@ -10127,8 +10128,8 @@ RectTransform:
   m_LocalScale: {x: 0, y: 0, z: 0}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 2128313200}
   - {fileID: 1142301788}
+  - {fileID: 2128313200}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
