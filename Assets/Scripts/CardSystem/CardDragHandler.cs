@@ -2,27 +2,32 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 
 public class CardDragHandler : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerClickHandler {
-    private RectTransform contentRT;
-    private CardUIController controller;
     private bool wasDragged = false;
-
-    void Start() {
-        controller = CardUIController.Instance;
-        if (controller != null) contentRT = controller.contentHolder;
-    }
+    private float startTime;
+    private Vector2 startPos;
 
     public void OnBeginDrag(PointerEventData eventData) {
-        wasDragged = true;
-        if (controller != null) controller.SetDragging(true);
+        wasDragged = false;
+        startTime = Time.time;
+        startPos = eventData.position;
     }
 
     public void OnDrag(PointerEventData eventData) {
-        if (contentRT != null) contentRT.anchoredPosition += new Vector2(eventData.delta.x, 0);
+        // 增加判定阈值，防止手指抖动误触发拖拽
+        if (eventData.delta.magnitude > 2f) wasDragged = true;
+        CardUIController.Instance.OnDragging(eventData.delta);
     }
 
     public void OnEndDrag(PointerEventData eventData) {
-        if (controller != null) controller.HandleEndDrag();
-        Invoke("ResetDragFlag", 0.15f);
+        // 手动计算速度: (当前像素位置 - 开始位置) / 经过的时间
+        float duration = Time.time - startTime;
+        Vector2 force = (eventData.position - startPos) / (duration > 0 ? duration : 0.01f);
+        
+        // 限制一下最大速度，防止滑得太离谱
+        float velocityX = Mathf.Clamp(force.x, -2000f, 2000f);
+        
+        CardUIController.Instance.OnDragEnd(velocityX);
+        Invoke("ResetDragFlag", 0.1f);
     }
 
     public void OnPointerClick(PointerEventData eventData) {

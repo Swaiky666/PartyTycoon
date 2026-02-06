@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using System.Collections.Generic;
 using TMPro;
+using DG.Tweening; 
 
 public class CardUIController : MonoBehaviour {
     public static CardUIController Instance;
@@ -10,21 +11,25 @@ public class CardUIController : MonoBehaviour {
     public GameObject cardUIPanel;      
     public RectTransform contentHolder; 
     public GameObject cardPrefab;       
-    
-    [Header("卡牌尺寸控制 (Inspector)")]
-    public float cardWidth = 500f;     // 在这里设置宽度
-    public float cardHeight = 750f;    // 在这里设置高度
-    public float cardSpacing = 600f;   // 卡牌之间的间距
-    public float lerpSpeed = 15f;       
-    
+
+    [Header("卡牌尺寸控制")]
+    public float cardWidth = 500f;     
+    public float cardHeight = 750f;    // 现在支持在 Inspector 自由调整高度
+    public float cardSpacing = 650f;   
+    public float swipeSensitivity = 1.1f; 
+
     private List<GameObject> spawnedCards = new List<GameObject>();
     private List<CardBase> currentDataList;
-    private int currentIndex = 0;
-    private Vector2 targetPos;          
-    private bool isDragging = false;    
-    private CardBase selectedCard;
+    private float minX; 
+    private float maxX; 
 
     void Awake() { Instance = this; }
+
+    public void HideUI() {
+        DOTween.Kill(contentHolder);
+        cardUIPanel.SetActive(false);
+        if (UIManager.Instance.viewButton) UIManager.Instance.viewButton.gameObject.SetActive(true);
+    }
 
     public void Show(List<CardBase> playerCards) {
         if (playerCards == null || playerCards.Count == 0) return;
@@ -38,39 +43,55 @@ public class CardUIController : MonoBehaviour {
         RefreshCardList();
     }
 
-    public void OnCardClicked(int index) {
-        if (currentDataList == null || index >= currentDataList.Count) return;
-        selectedCard = currentDataList[index];
+    private void RefreshCardList() {
+        DOTween.Kill(contentHolder);
+        foreach (var c in spawnedCards) if(c != null) Destroy(c);
+        spawnedCards.Clear();
 
-        if (CameraController.Instance != null) {
-            CameraController.Instance.enabled = true; 
-            CameraController.Instance.SetFreeMode(true); 
+        // 1. 强制居中坐标系
+        contentHolder.anchorMin = contentHolder.anchorMax = contentHolder.pivot = new Vector2(0.5f, 0.5f);
+        // 自动适配高度到 Content 容器
+        contentHolder.sizeDelta = new Vector2(contentHolder.sizeDelta.x, cardHeight);
+
+        // 2. 边界：第一张卡居中时 x=0
+        maxX = 0; 
+        minX = -(currentDataList.Count - 1) * cardSpacing;
+
+        for (int i = 0; i < currentDataList.Count; i++) {
+            GameObject cardObj = Instantiate(cardPrefab, contentHolder);
+            cardObj.name = i.ToString();
+            RectTransform rt = cardObj.GetComponent<RectTransform>();
+            
+            rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+            // 这里应用你设置的 cardWidth 和 cardHeight
+            rt.sizeDelta = new Vector2(cardWidth, cardHeight); 
+            rt.anchoredPosition = new Vector2(i * cardSpacing, 0);
+            
+            UpdateCardVisuals(cardObj, currentDataList[i]);
+            if (!cardObj.GetComponent<CardDragHandler>()) cardObj.AddComponent<CardDragHandler>();
+            spawnedCards.Add(cardObj);
         }
-
-        cardUIPanel.SetActive(false);
-        if (CardRangeFinder.Instance != null) CardRangeFinder.Instance.ShowRange(selectedCard);
-
-        SetupCardButton("返回", OnBackFromPreview);
-        UIManager.Instance.UpdateStatus($"已选:{selectedCard.cardName}，滑动屏幕平移视角");
+        contentHolder.anchoredPosition = Vector2.zero;
     }
 
-    public void OnTargetNodeSelected(GridNode node) {
-        UIManager.Instance.ShowActionButton("确认位置", () => {
-            PlayerController p = TurnManager.Instance.GetCurrentPlayer();
-            if (selectedCard != null && selectedCard.UseCard(p, node)) {
-                FinishProcess();
-            }
-        });
+    public void OnDragging(Vector2 delta) {
+        DOTween.Kill(contentHolder);
+        float newX = contentHolder.anchoredPosition.x + delta.x * swipeSensitivity;
+        // 弹性区间
+        newX = Mathf.Clamp(newX, minX - 300f, maxX + 300f);
+        contentHolder.anchoredPosition = new Vector2(newX, 0);
     }
 
-    private void OnBackFromPreview() {
-        if (CardRangeFinder.Instance != null) CardRangeFinder.Instance.ClearHighlight();
-        if (CameraController.Instance != null) {
-            CameraController.Instance.SetFreeMode(false);
-            CameraController.Instance.enabled = false; 
-        }
-        if (UIManager.Instance != null) UIManager.Instance.HideActionButton();
-        Show(currentDataList); 
+    public void OnDragEnd(float velocityX) {
+        float inertia = velocityX * 0.12f;
+        float predictedX = contentHolder.anchoredPosition.x + inertia;
+
+        int targetIndex = Mathf.RoundToInt(-predictedX / cardSpacing);
+        targetIndex = Mathf.Clamp(targetIndex, 0, currentDataList.Count - 1);
+        
+        float finalX = -targetIndex * cardSpacing;
+        // OutBack 效果在手机上非常有弹性感
+        contentHolder.DOAnchorPosX(finalX, 0.45f).SetEase(Ease.OutBack);
     }
 
     private void OnBackFromList() {
@@ -78,20 +99,15 @@ public class CardUIController : MonoBehaviour {
         if (TurnManager.Instance != null) TurnManager.Instance.StartTurn();
     }
 
-    private void FinishProcess() {
-        if (CardRangeFinder.Instance != null) CardRangeFinder.Instance.ClearHighlight();
-        if (CameraController.Instance != null) {
-            CameraController.Instance.enabled = true;
-            CameraController.Instance.SetFreeMode(false);
-        }
-        if (UIManager.Instance != null) UIManager.Instance.HideActionButton();
-        TurnManager.Instance.CompleteCardAction();
-        HideUI();
-    }
-
-    public void HideUI() { 
-        cardUIPanel.SetActive(false); 
-        if (UIManager.Instance.viewButton) UIManager.Instance.viewButton.gameObject.SetActive(true);
+    public void OnCardClicked(int index) {
+        if (currentDataList == null || index >= currentDataList.Count) return;
+        CardBase selectedCard = currentDataList[index];
+        cardUIPanel.SetActive(false);
+        if (CardRangeFinder.Instance != null) CardRangeFinder.Instance.ShowRange(selectedCard);
+        SetupCardButton("返回", () => {
+            if (CardRangeFinder.Instance != null) CardRangeFinder.Instance.ClearHighlight();
+            Show(currentDataList);
+        });
     }
 
     private void SetupCardButton(string label, UnityEngine.Events.UnityAction action) {
@@ -102,56 +118,12 @@ public class CardUIController : MonoBehaviour {
         }
     }
 
-    private void RefreshCardList() {
-        foreach (var c in spawnedCards) if(c != null) Destroy(c);
-        spawnedCards.Clear();
-        
-        float totalWidth = currentDataList.Count * cardSpacing;
-        contentHolder.sizeDelta = new Vector2(totalWidth, contentHolder.sizeDelta.y);
-
-        for (int i = 0; i < currentDataList.Count; i++) {
-            GameObject cardObj = Instantiate(cardPrefab, contentHolder);
-            cardObj.name = i.ToString();
-            
-            RectTransform rt = cardObj.GetComponent<RectTransform>();
-            // 确保锚点居中以便计算
-            rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
-            
-            // --- 核心修改：应用 Inspector 中的尺寸 ---
-            rt.sizeDelta = new Vector2(cardWidth, cardHeight); 
-            
-            float offsetX = (i * cardSpacing) - (totalWidth * 0.5f) + (cardSpacing * 0.5f);
-            rt.anchoredPosition = new Vector2(offsetX, 0); 
-            
-            UpdateCardVisuals(cardObj, currentDataList[i]);
-            cardObj.AddComponent<CardDragHandler>();
-            spawnedCards.Add(cardObj);
-        }
-        targetPos = new Vector2(-currentIndex * cardSpacing, 0);
-    }
-
     private void UpdateCardVisuals(GameObject cardObj, CardBase data) {
         TextMeshProUGUI[] texts = cardObj.GetComponentsInChildren<TextMeshProUGUI>();
         foreach (var t in texts) {
             if (t.gameObject.name == "Name") t.text = data.cardName;
             else if (t.gameObject.name == "Desc") t.text = data.description;
-            // 避免文字遮挡射线检测
             t.raycastTarget = false; 
-        }
-    }
-
-    public void SetDragging(bool dragging) { isDragging = dragging; }
-    public void HandleEndDrag() {
-        isDragging = false;
-        float currentX = contentHolder.anchoredPosition.x;
-        currentIndex = Mathf.RoundToInt(-currentX / cardSpacing);
-        currentIndex = Mathf.Clamp(currentIndex, 0, spawnedCards.Count - 1);
-        targetPos = new Vector2(-currentIndex * cardSpacing, contentHolder.anchoredPosition.y);
-    }
-
-    void Update() {
-        if (cardUIPanel.activeSelf && !isDragging) {
-            contentHolder.anchoredPosition = Vector2.Lerp(contentHolder.anchoredPosition, targetPos, Time.deltaTime * lerpSpeed);
         }
     }
 }
