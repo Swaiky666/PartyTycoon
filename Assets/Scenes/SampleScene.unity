@@ -311,9 +311,10 @@ MonoBehaviour:
   savedPlayers: []
   savedGrids: []
   allPossibleCards:
-  - {fileID: 0}
-  barricadePrefab: {fileID: 0}
-  iceEffectPrefab: {fileID: 0}
+  - {fileID: 11400000, guid: 228f94ba9c8cf4f348fbd92cd5aa3d57, type: 2}
+  - {fileID: 11400000, guid: fa9dc0e8294af4955bd9f7b2db57742d, type: 2}
+  barricadePrefab: {fileID: 1888194853599230624, guid: 3146f86dda80d419d969f57748e67a14, type: 3}
+  iceEffectPrefab: {fileID: 1417109416525264207, guid: 6cb037c5634ee4110bc07fc9015edd66, type: 3}
 --- !u!1 &64212456
 GameObject:
   m_ObjectHideFlags: 0
