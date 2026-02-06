@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using System.Collections.Generic;
 using TMPro;
-using DG.Tweening; // 确保已安装 DOTween
+using DG.Tweening; 
 
 public class CardUIController : MonoBehaviour {
     public static CardUIController Instance;
@@ -25,13 +25,11 @@ public class CardUIController : MonoBehaviour {
 
     void Awake() { Instance = this; }
 
-    // 外部调用：打开 UI
     public void Show(List<CardBase> playerCards) {
         if (playerCards == null || playerCards.Count == 0) return;
         currentDataList = playerCards;
         cardUIPanel.SetActive(true);
         
-        // 隐藏主界面视角切换按钮
         if (UIManager.Instance.viewButton != null) 
             UIManager.Instance.viewButton.gameObject.SetActive(false);
 
@@ -39,24 +37,20 @@ public class CardUIController : MonoBehaviour {
         RefreshCardList();
     }
 
-    // 核心：刷新与生成列表
     private void RefreshCardList() {
         DOTween.Kill(contentHolder);
         foreach (var c in spawnedCards) if(c != null) Destroy(c);
         spawnedCards.Clear();
 
-        // 1. 强制初始化容器 Anchor 和 Pivot 到正中心 (0.5, 0.5)
         contentHolder.anchorMin = contentHolder.anchorMax = contentHolder.pivot = new Vector2(0.5f, 0.5f);
         contentHolder.sizeDelta = new Vector2(contentHolder.sizeDelta.x, cardHeight);
 
-        // 2. 边界计算：第一张在 0，最后一张在 -(count-1)*spacing
         maxX = 0; 
         minX = -(currentDataList.Count - 1) * cardSpacing;
 
-        // 3. 生成卡牌
         for (int i = 0; i < currentDataList.Count; i++) {
             GameObject cardObj = Instantiate(cardPrefab, contentHolder);
-            cardObj.name = i.ToString(); // 用于点击判定
+            cardObj.name = i.ToString(); 
             
             RectTransform rt = cardObj.GetComponent<RectTransform>();
             rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
@@ -65,44 +59,31 @@ public class CardUIController : MonoBehaviour {
             
             UpdateCardVisuals(cardObj, currentDataList[i]);
             
-            // 确保挂载了拖拽处理器
             if (!cardObj.GetComponent<CardDragHandler>()) 
                 cardObj.AddComponent<CardDragHandler>();
                 
             spawnedCards.Add(cardObj);
         }
-        
-        // 4. 重置位置：第一张卡牌居中
         contentHolder.anchoredPosition = Vector2.zero;
     }
 
-    // 处理拖拽位移
     public void OnDragging(Vector2 delta) {
         DOTween.Kill(contentHolder);
         float newX = contentHolder.anchoredPosition.x + delta.x * swipeSensitivity;
-        // 弹性区间：允许拖过头 300 像素
         newX = Mathf.Clamp(newX, minX - 300f, maxX + 300f);
         contentHolder.anchoredPosition = new Vector2(newX, 0);
     }
 
-    // 处理拖拽结束：惯性吸附
     public void OnDragEnd(float velocityX) {
         float inertia = velocityX * 0.12f;
         float predictedX = contentHolder.anchoredPosition.x + inertia;
-
-        // 计算最接近的卡牌索引
         int targetIndex = Mathf.RoundToInt(-predictedX / cardSpacing);
         targetIndex = Mathf.Clamp(targetIndex, 0, currentDataList.Count - 1);
-        
         float finalX = -targetIndex * cardSpacing;
-
-        // 丝滑吸附回弹
         contentHolder.DOAnchorPosX(finalX, 0.45f).SetEase(Ease.OutBack);
     }
 
-    // 业务：更新卡牌视觉（文字 + 图片）
     private void UpdateCardVisuals(GameObject cardObj, CardBase data) {
-        // 更新文字
         TextMeshProUGUI[] texts = cardObj.GetComponentsInChildren<TextMeshProUGUI>();
         foreach (var t in texts) {
             if (t.gameObject.name == "Name") t.text = data.cardName;
@@ -110,7 +91,6 @@ public class CardUIController : MonoBehaviour {
             t.raycastTarget = false; 
         }
 
-        // 更新图片：查找名为 "Icon" 的子物体
         Transform iconTransform = cardObj.transform.Find("Icon");
         if (iconTransform != null) {
             Image img = iconTransform.GetComponent<Image>();
@@ -121,25 +101,35 @@ public class CardUIController : MonoBehaviour {
         }
     }
 
-    // 业务：点击卡牌
+    // 关键修改点：点击具体卡牌后的行为
     public void OnCardClicked(int index) {
         if (currentDataList == null || index >= currentDataList.Count) return;
         CardBase selectedCard = currentDataList[index];
         
         cardUIPanel.SetActive(false);
+
+        // --- 核心修复：通知 TurnManager 进入目标选择模式（垂直俯视+平移） ---
+        if (TurnManager.Instance != null) {
+            TurnManager.Instance.EnterCardTargetingMode();
+        }
+
         if (CardRangeFinder.Instance != null) CardRangeFinder.Instance.ShowRange(selectedCard);
         
-        SetupCardButton("返回", () => {
+        // 将“道具卡”按钮配置为“取消”
+        SetupCardButton("取消", () => {
             if (CardRangeFinder.Instance != null) CardRangeFinder.Instance.ClearHighlight();
-            Show(currentDataList);
+            // 取消后回到 StartTurn（会重置视角和 UI）
+            if (TurnManager.Instance != null) TurnManager.Instance.StartTurn();
         });
+
+        // 确保“取消”按钮是激活的
+        if (UIManager.Instance.cardButton != null) 
+            UIManager.Instance.cardButton.gameObject.SetActive(true);
     }
 
-    // 提供给 TurnManager 的关闭接口
     public void HideUI() {
         DOTween.Kill(contentHolder);
         cardUIPanel.SetActive(false);
-        if (UIManager.Instance.viewButton) UIManager.Instance.viewButton.gameObject.SetActive(true);
     }
 
     private void OnBackFromList() {
