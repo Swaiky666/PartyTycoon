@@ -55,10 +55,11 @@ public class TurnManager : MonoBehaviour {
         originalStatusText = $"当前回合：玩家 {p.playerId}";
         UIManager.Instance.UpdateStatus(originalStatusText);
         
+        // --- 核心修改：使用 ShowDice(true) 显示骰子模型 ---
         if (diceAnimator != null) diceAnimator.ShowAndIdle();
+        
         UIManager.Instance.ShowActionButton("投掷骰子", () => StartDiceRoll());
 
-        // 初始 UI 状态
         UIManager.Instance.SetExtraButtonsVisible(true);
         UIManager.Instance.SetViewButtonLabel("自由俯视");
         UIManager.Instance.SetCardButtonLabel("道具卡");
@@ -81,6 +82,9 @@ public class TurnManager : MonoBehaviour {
                 return;
             }
 
+            // --- 核心修改：进入卡牌选择，隐藏骰子模型 ---
+            if (diceAnimator != null) diceAnimator.ShowDice(false);
+
             UIManager.Instance.HideActionButton(); 
             UIManager.Instance.SetCardButtonLabel("返回"); 
             
@@ -91,6 +95,9 @@ public class TurnManager : MonoBehaviour {
         } else {
             if (CameraController.Instance != null) CameraController.Instance.enabled = true;
             
+            // --- 核心修改：切回投骰子，显示骰子模型并继续旋转 ---
+            if (diceAnimator != null) diceAnimator.ShowAndIdle();
+
             CardUIController.Instance.HideUI();
             if (CardRangeFinder.Instance != null) CardRangeFinder.Instance.ClearHighlight();
             
@@ -105,6 +112,13 @@ public class TurnManager : MonoBehaviour {
         if (isInCardMode) ToggleCardMode(); 
 
         isInFreeView = !isInFreeView;
+        
+        // --- 核心修改：自由视角界面隐藏骰子模型 ---
+        if (diceAnimator != null) {
+            if (isInFreeView) diceAnimator.ShowDice(false);
+            else diceAnimator.ShowAndIdle();
+        }
+
         CameraController.Instance.SetFreeMode(isInFreeView);
         UIManager.Instance.SetViewButtonLabel(isInFreeView ? "返回" : "自由俯视");
         
@@ -115,42 +129,38 @@ public class TurnManager : MonoBehaviour {
     public void CompleteCardAction() {
         isInCardMode = false;
         if (CameraController.Instance != null) CameraController.Instance.enabled = true;
+        // StartTurn 会自动处理骰子模型的 ShowAndIdle
         StartTurn(); 
     }
 
     void StartDiceRoll() {
         if (isInFreeView) ToggleFreeView();
         
-        // 核心修改：在按下投掷按钮后，先检查冰冻状态
         PlayerController p = GetCurrentPlayer();
-        if (p != null && p.remainingFreezeTurns > 0) {
-            // 如果被冰冻，直接进入处理序列（处理扣减回合和跳过逻辑）
-            UIManager.Instance.SetExtraButtonsVisible(false);
-            UIManager.Instance.HideActionButton();
-            StartCoroutine(ProcessTurnSequence());
-        } else {
-            // 正常逻辑
-            UIManager.Instance.SetExtraButtonsVisible(false);
-            UIManager.Instance.HideActionButton();
-            StartCoroutine(ProcessTurnSequence());
-        }
+        
+        // 投骰子前确保模型可见
+        if (diceAnimator != null) diceAnimator.ShowDice(true);
+
+        UIManager.Instance.SetExtraButtonsVisible(false);
+        UIManager.Instance.HideActionButton();
+        StartCoroutine(ProcessTurnSequence());
     }
 
     IEnumerator ProcessTurnSequence() {
         PlayerController p = turnOrder[currentIndex];
 
-        // --- 新增：冰冻状态检测与拦截 ---
         if (p.CheckFreezeStatus()) {
-            // 如果玩家被冰冻，此方法内部会扣除剩余回合并更新UI
-            // 我们等待一会儿让玩家看清状态，然后直接结束本回合
+            // 冰冻跳过回合时隐藏模型
+            if (diceAnimator != null) diceAnimator.ShowDice(false);
             yield return new WaitForSeconds(2.0f);
             EndTurn();
-            yield break; // 彻底跳过后续的掷骰子和移动逻辑
+            yield break; 
         }
 
-        // --- 以下为原有掷骰子和移动逻辑 ---
         int steps = Random.Range(1, 7);
         UIManager.Instance.UpdateStatus($"玩家 {p.playerId} 投出了 {steps} 点！");
+        
+        // 播放投掷序列，完成后 PlayRollSequence 内部会根据 autoHide 决定是否隐藏模型
         if (diceAnimator != null) yield return StartCoroutine(diceAnimator.PlayRollSequence(steps, null));
 
         bool moveDone = false;
@@ -168,6 +178,8 @@ public class TurnManager : MonoBehaviour {
     }
 
     void EndTurn() {
+        // 回合结束确保隐藏模型
+        if (diceAnimator != null) diceAnimator.ShowDice(false);
         currentIndex = (currentIndex + 1) % turnOrder.Count;
         StartTurn();
     }
