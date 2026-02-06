@@ -125,6 +125,6 @@ MonoBehaviour:
   arrowPrefab: {fileID: 5427742095911369991, guid: 9002fc4049e814d89bf56ff011d729d0, type: 3}
   money: 5000
   startingCards:
-  - {fileID: 11400000, guid: dd5fe67fcd32a450e94fd62a3063aba1, type: 2}
+  - {fileID: 11400000, guid: 228f94ba9c8cf4f348fbd92cd5aa3d57, type: 2}
   cards: []
   currentGrid: {fileID: 0}

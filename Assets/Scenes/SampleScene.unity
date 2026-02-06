@@ -310,7 +310,7 @@ MonoBehaviour:
   savedPlayers: []
   savedGrids: []
   allPossibleCards:
-  - {fileID: 11400000, guid: dd5fe67fcd32a450e94fd62a3063aba1, type: 2}
+  - {fileID: 0}
 --- !u!1 &64212456
 GameObject:
   m_ObjectHideFlags: 0
@@ -4977,8 +4977,7 @@ MonoBehaviour:
   cardUIPanel: {fileID: 1142301787}
   contentHolder: {fileID: 132546992}
   cardPrefab: {fileID: 3193726809298855494, guid: d85c3130c29434b2da4e103cf9879ec7, type: 3}
-  backButtonText: {fileID: 0}
-  cardWidth: 600
+  cardWidth: 650
   cardHeight: 1050
   cardSpacing: 200
   lerpSpeed: 10
@@ -5850,6 +5849,7 @@ MonoBehaviour:
   followSmoothTime: 0.3
   rotationSpeed: 1
   zoomSpeed: 0.5
+  panSensitivity: 0.02
   panRange: 15
 --- !u!1 &965502389
 GameObject:
