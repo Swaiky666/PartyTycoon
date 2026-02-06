@@ -1,6 +1,6 @@
 using UnityEngine;
 
-// 将枚举放在外面或基类上方
+// 卡牌类型枚举
 public enum CardType { Barricade, Tool, Buff } 
 
 public abstract class CardBase : ScriptableObject {

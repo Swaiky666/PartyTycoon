@@ -13,21 +13,23 @@ public class CardDragHandler : MonoBehaviour, IBeginDragHandler, IDragHandler, I
     }
 
     public void OnDrag(PointerEventData eventData) {
-        // 增加判定阈值，防止手指抖动误触发拖拽
+        // 记录是否有大幅度滑动，防止手指抖动误判为拖拽
         if (eventData.delta.magnitude > 2f) wasDragged = true;
-        CardUIController.Instance.OnDragging(eventData.delta);
+        
+        if (CardUIController.Instance != null)
+            CardUIController.Instance.OnDragging(eventData.delta);
     }
 
     public void OnEndDrag(PointerEventData eventData) {
-        // 手动计算速度: (当前像素位置 - 开始位置) / 经过的时间
         float duration = Time.time - startTime;
-        Vector2 force = (eventData.position - startPos) / (duration > 0 ? duration : 0.01f);
+        // 这里的 velocity 计算兼容了鼠标和触摸屏
+        float velocityX = (eventData.position.x - startPos.x) / (duration > 0 ? duration : 0.01f);
         
-        // 限制一下最大速度，防止滑得太离谱
-        float velocityX = Mathf.Clamp(force.x, -2000f, 2000f);
-        
-        CardUIController.Instance.OnDragEnd(velocityX);
-        Invoke("ResetDragFlag", 0.1f);
+        if (CardUIController.Instance != null)
+            CardUIController.Instance.OnDragEnd(velocityX);
+            
+        // 延迟重置，确保在松手那一帧不会触发 OnPointerClick
+        Invoke("ResetDragFlag", 0.12f);
     }
 
     public void OnPointerClick(PointerEventData eventData) {
@@ -37,5 +39,6 @@ public class CardDragHandler : MonoBehaviour, IBeginDragHandler, IDragHandler, I
             }
         }
     }
+
     private void ResetDragFlag() { wasDragged = false; }
 }
