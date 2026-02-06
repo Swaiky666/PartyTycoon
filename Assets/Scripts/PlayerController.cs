@@ -3,7 +3,6 @@ using System.Collections;
 using System.Collections.Generic;
 
 public class PlayerController : MonoBehaviour {
-    // ... (保持原有变量声明不变)
     public int playerId;
     public float moveSpeed = 5f;
     public float rotationSpeed = 10f;
@@ -16,21 +15,46 @@ public class PlayerController : MonoBehaviour {
     private GridNode lastGrid; 
     private GridNode chosenNode = null;
 
+    [Header("异常状态")]
+    public int remainingFreezeTurns = 0; 
+    private GameObject currentIceVisual;
+
     void Awake() {
         foreach (var c in startingCards) if (c != null) cards.Add(Instantiate(c));
     }
 
-    public void ChangeMoney(int amount) {
-        money += amount;
-        UIManager.Instance.UpdatePlayerStats(this);
+    // --- 冰冻逻辑 ---
+    public void ApplyFreeze(int turns, GameObject prefab) {
+        remainingFreezeTurns = turns;
+        if (currentIceVisual == null && prefab != null) {
+            currentIceVisual = Instantiate(prefab, transform.position, Quaternion.identity, transform);
+        }
+        // 视觉提示：变蓝
+        SetModelColor(Color.cyan);
     }
 
-    public void SetInitialPosition(GridNode node) {
-        currentGrid = node;
-        lastGrid = null; 
-        transform.position = GetPosWithHeight(node.GetSlotPosition(this.gameObject));
+    public bool CheckFreezeStatus() {
+        if (remainingFreezeTurns > 0) {
+            remainingFreezeTurns--;
+            UIManager.Instance.UpdateStatus($"玩家 {playerId} 被冰冻，剩余 {remainingFreezeTurns} 回合");
+            if (remainingFreezeTurns <= 0) Unfreeze();
+            return true; // 冰冻中，跳过回合
+        }
+        return false;
     }
 
+    public void Unfreeze() {
+        remainingFreezeTurns = 0;
+        if (currentIceVisual != null) Destroy(currentIceVisual);
+        SetModelColor(Color.white);
+    }
+
+    private void SetModelColor(Color color) {
+        Renderer[] rs = GetComponentsInChildren<Renderer>();
+        foreach (var r in rs) r.material.color = color;
+    }
+
+    // --- 移动逻辑 ---
     public void StartMoving(int steps, System.Action onComplete) {
         StartCoroutine(MoveRoutine(steps, onComplete));
     }
@@ -57,11 +81,10 @@ public class PlayerController : MonoBehaviour {
                 currentGrid = nextNode;
                 remainingSteps--;
 
-                // --- 新增：路障检测逻辑 ---
+                // 路障检测
                 if (currentGrid.HasBarricade()) {
-                    Debug.Log("踩回路障，移动停止！");
-                    currentGrid.ClearBarricade(); // 销毁路障物理表现
-                    remainingSteps = 0; // 清空步数，强制结束循环
+                    currentGrid.ClearBarricade();
+                    remainingSteps = 0;
                     break;
                 }
             } else break;
@@ -70,11 +93,9 @@ public class PlayerController : MonoBehaviour {
         onComplete?.Invoke();
     }
 
-    // ... (保持 WaitForBranchSelection, MoveToNode 等其余代码不变)
     private IEnumerator WaitForBranchSelection(List<GridNode> options, System.Action<GridNode> onSelected) {
         List<GameObject> activeArrows = new List<GameObject>();
         chosenNode = null;
-        UIManager.Instance.UpdateStatus("请选择前进方向");
         foreach (var node in options) {
             Vector3 diff = node.transform.position - currentGrid.transform.position;
             Quaternion rot = Quaternion.identity;
@@ -107,5 +128,7 @@ public class PlayerController : MonoBehaviour {
         transform.position = targetPos;
     }
 
+    public void ChangeMoney(int amount) { money += amount; UIManager.Instance.UpdatePlayerStats(this); }
+    public void SetInitialPosition(GridNode node) { currentGrid = node; transform.position = GetPosWithHeight(node.GetSlotPosition(this.gameObject)); }
     public Vector3 GetPosWithHeight(Vector3 b) => new Vector3(b.x, b.y + heightOffset, b.z);
 }

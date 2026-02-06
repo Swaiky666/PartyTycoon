@@ -69,32 +69,26 @@ public class TurnManager : MonoBehaviour {
         UIManager.Instance.cardButton.onClick.AddListener(ToggleCardMode);
     }
 
-    // --- 借鉴自由跟随效果的修改 ---
     void ToggleCardMode() {
         if (isInFreeView) return; 
         
-        // 核心逻辑：切换开关状态
         isInCardMode = !isInCardMode;
 
         if (isInCardMode) {
-            // 检查单例是否存在，防止报错
             if (CardUIController.Instance == null) {
                 Debug.LogError("场景中缺少 CardUIController 实例！");
                 isInCardMode = false;
                 return;
             }
 
-            // 1. 进入卡牌模式
             UIManager.Instance.HideActionButton(); 
-            UIManager.Instance.SetCardButtonLabel("返回"); // 改变按钮文案
+            UIManager.Instance.SetCardButtonLabel("返回"); 
             
-            // 2. 禁用相机，防止拖拽干扰
             if (CameraController.Instance != null) CameraController.Instance.enabled = false;
             
             CardUIController.Instance.Show(GetCurrentPlayer().cards);
             UIManager.Instance.UpdateStatus("请选择要使用的道具卡");
         } else {
-            // 3. 再次点击，返回正常模式
             if (CameraController.Instance != null) CameraController.Instance.enabled = true;
             
             CardUIController.Instance.HideUI();
@@ -102,14 +96,13 @@ public class TurnManager : MonoBehaviour {
             
             UIManager.Instance.SetCardButtonLabel("道具卡");
             
-            // 恢复“投骰子”按钮显示
             UIManager.Instance.ShowActionButton("投掷骰子", () => StartDiceRoll());
             UIManager.Instance.UpdateStatus(originalStatusText);
         }
     }
 
     void ToggleFreeView() {
-        if (isInCardMode) ToggleCardMode(); // 如果在看牌，先关掉牌
+        if (isInCardMode) ToggleCardMode(); 
 
         isInFreeView = !isInFreeView;
         CameraController.Instance.SetFreeMode(isInFreeView);
@@ -127,13 +120,35 @@ public class TurnManager : MonoBehaviour {
 
     void StartDiceRoll() {
         if (isInFreeView) ToggleFreeView();
-        UIManager.Instance.SetExtraButtonsVisible(false);
-        UIManager.Instance.HideActionButton();
-        StartCoroutine(ProcessTurnSequence());
+        
+        // 核心修改：在按下投掷按钮后，先检查冰冻状态
+        PlayerController p = GetCurrentPlayer();
+        if (p != null && p.remainingFreezeTurns > 0) {
+            // 如果被冰冻，直接进入处理序列（处理扣减回合和跳过逻辑）
+            UIManager.Instance.SetExtraButtonsVisible(false);
+            UIManager.Instance.HideActionButton();
+            StartCoroutine(ProcessTurnSequence());
+        } else {
+            // 正常逻辑
+            UIManager.Instance.SetExtraButtonsVisible(false);
+            UIManager.Instance.HideActionButton();
+            StartCoroutine(ProcessTurnSequence());
+        }
     }
 
     IEnumerator ProcessTurnSequence() {
         PlayerController p = turnOrder[currentIndex];
+
+        // --- 新增：冰冻状态检测与拦截 ---
+        if (p.CheckFreezeStatus()) {
+            // 如果玩家被冰冻，此方法内部会扣除剩余回合并更新UI
+            // 我们等待一会儿让玩家看清状态，然后直接结束本回合
+            yield return new WaitForSeconds(2.0f);
+            EndTurn();
+            yield break; // 彻底跳过后续的掷骰子和移动逻辑
+        }
+
+        // --- 以下为原有掷骰子和移动逻辑 ---
         int steps = Random.Range(1, 7);
         UIManager.Instance.UpdateStatus($"玩家 {p.playerId} 投出了 {steps} 点！");
         if (diceAnimator != null) yield return StartCoroutine(diceAnimator.PlayRollSequence(steps, null));

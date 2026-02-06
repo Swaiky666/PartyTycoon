@@ -171,6 +171,7 @@ MonoBehaviour:
   - {fileID: 74039574}
   - {fileID: 115468257}
   - {fileID: 261090590}
+  currentBarricade: {fileID: 0}
 --- !u!65 &35521946
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -311,6 +312,8 @@ MonoBehaviour:
   savedGrids: []
   allPossibleCards:
   - {fileID: 0}
+  barricadePrefab: {fileID: 0}
+  iceEffectPrefab: {fileID: 0}
 --- !u!1 &64212456
 GameObject:
   m_ObjectHideFlags: 0
@@ -943,7 +946,7 @@ RectTransform:
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 2000, y: 2000}
-  m_Pivot: {x: 0.5, y: 0.5}
+  m_Pivot: {x: 0, y: 0.5}
 --- !u!1 &134385576
 GameObject:
   m_ObjectHideFlags: 0
@@ -1086,6 +1089,7 @@ MonoBehaviour:
   - {fileID: 1006893227}
   - {fileID: 238260864}
   - {fileID: 560734133}
+  currentBarricade: {fileID: 0}
 --- !u!65 &162607557
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1812,6 +1816,7 @@ MonoBehaviour:
   - {fileID: 1420878928}
   - {fileID: 904966963}
   - {fileID: 1884999248}
+  currentBarricade: {fileID: 0}
 --- !u!65 &370984606
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1994,6 +1999,7 @@ MonoBehaviour:
   - {fileID: 878744007}
   - {fileID: 105670370}
   - {fileID: 1559137948}
+  currentBarricade: {fileID: 0}
 --- !u!65 &398738721
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -2135,6 +2141,7 @@ MonoBehaviour:
   - {fileID: 580034526}
   - {fileID: 1890138750}
   - {fileID: 451647010}
+  currentBarricade: {fileID: 0}
 --- !u!65 &400849114
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -2524,6 +2531,7 @@ MonoBehaviour:
   - {fileID: 827105522}
   - {fileID: 1042098068}
   - {fileID: 1154412799}
+  currentBarricade: {fileID: 0}
 --- !u!65 &500621653
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -3161,6 +3169,7 @@ MonoBehaviour:
   - {fileID: 793604912}
   - {fileID: 1842460746}
   - {fileID: 582778920}
+  currentBarricade: {fileID: 0}
 --- !u!65 &608232686
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -3746,6 +3755,7 @@ MonoBehaviour:
   - {fileID: 756411213}
   - {fileID: 1298658439}
   - {fileID: 494622350}
+  currentBarricade: {fileID: 0}
 --- !u!65 &692353300
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -4776,6 +4786,7 @@ MonoBehaviour:
   - {fileID: 681752267}
   - {fileID: 1551118392}
   - {fileID: 918548320}
+  currentBarricade: {fileID: 0}
 --- !u!65 &801354528
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -4979,7 +4990,7 @@ MonoBehaviour:
   cardPrefab: {fileID: 3193726809298855494, guid: d85c3130c29434b2da4e103cf9879ec7, type: 3}
   cardWidth: 650
   cardHeight: 1050
-  cardSpacing: 200
+  cardSpacing: 600
   lerpSpeed: 10
 --- !u!1 &838189551
 GameObject:
@@ -5410,6 +5421,7 @@ MonoBehaviour:
   - {fileID: 747452529}
   - {fileID: 1893449556}
   - {fileID: 594192657}
+  currentBarricade: {fileID: 0}
 --- !u!65 &911139907
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -5592,6 +5604,7 @@ MonoBehaviour:
   - {fileID: 619380228}
   - {fileID: 1612555161}
   - {fileID: 1826495896}
+  currentBarricade: {fileID: 0}
 --- !u!65 &943726421
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -5847,7 +5860,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   target: {fileID: 0}
   followSmoothTime: 0.3
-  rotationSpeed: 1
+  rotationSpeed: 0.01
   zoomSpeed: 0.5
   panSensitivity: 0.02
   panRange: 15
@@ -6508,6 +6521,7 @@ MonoBehaviour:
   - {fileID: 1872048786}
   - {fileID: 1155840167}
   - {fileID: 353568835}
+  currentBarricade: {fileID: 0}
 --- !u!65 &1067894143
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -6680,6 +6694,7 @@ MonoBehaviour:
   - {fileID: 2144285732}
   - {fileID: 646879149}
   - {fileID: 985274005}
+  currentBarricade: {fileID: 0}
 --- !u!65 &1100987854
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -6852,6 +6867,7 @@ MonoBehaviour:
   - {fileID: 1390544788}
   - {fileID: 134385577}
   - {fileID: 497807105}
+  currentBarricade: {fileID: 0}
 --- !u!65 &1101050644
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -7162,6 +7178,7 @@ MonoBehaviour:
   - {fileID: 243425662}
   - {fileID: 271914935}
   - {fileID: 491324140}
+  currentBarricade: {fileID: 0}
 --- !u!65 &1123167490
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -7441,6 +7458,7 @@ MonoBehaviour:
   - {fileID: 1850715707}
   - {fileID: 530924512}
   - {fileID: 258936076}
+  currentBarricade: {fileID: 0}
 --- !u!65 &1149594014
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -7675,6 +7693,7 @@ MonoBehaviour:
   - {fileID: 1339596920}
   - {fileID: 106875845}
   - {fileID: 916476975}
+  currentBarricade: {fileID: 0}
 --- !u!65 &1165946118
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -7909,6 +7928,7 @@ MonoBehaviour:
   - {fileID: 632341071}
   - {fileID: 1841799302}
   - {fileID: 1650522677}
+  currentBarricade: {fileID: 0}
 --- !u!65 &1195927446
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -8050,6 +8070,7 @@ MonoBehaviour:
   - {fileID: 965502390}
   - {fileID: 397078004}
   - {fileID: 1553329282}
+  currentBarricade: {fileID: 0}
 --- !u!65 &1201938096
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -8398,6 +8419,7 @@ MonoBehaviour:
   - {fileID: 64212457}
   - {fileID: 1028039775}
   - {fileID: 1220210493}
+  currentBarricade: {fileID: 0}
 --- !u!65 &1227372592
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -8614,6 +8636,7 @@ MonoBehaviour:
   - {fileID: 1761331376}
   - {fileID: 533608976}
   - {fileID: 1755397674}
+  currentBarricade: {fileID: 0}
 --- !u!65 &1261981076
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -9446,6 +9469,7 @@ MonoBehaviour:
   - {fileID: 782104327}
   - {fileID: 711807257}
   - {fileID: 89400481}
+  currentBarricade: {fileID: 0}
 --- !u!1 &1466153558
 GameObject:
   m_ObjectHideFlags: 0
@@ -9787,6 +9811,7 @@ MonoBehaviour:
   - {fileID: 1002714444}
   - {fileID: 1614612385}
   - {fileID: 1994961754}
+  currentBarricade: {fileID: 0}
 --- !u!65 &1540663674
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -10217,6 +10242,7 @@ MonoBehaviour:
   - {fileID: 866282947}
   - {fileID: 214575966}
   - {fileID: 665807663}
+  currentBarricade: {fileID: 0}
 --- !u!65 &1591563369
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -10482,6 +10508,7 @@ MonoBehaviour:
   - {fileID: 1411269077}
   - {fileID: 1357207290}
   - {fileID: 976028593}
+  currentBarricade: {fileID: 0}
 --- !u!65 &1616433108
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -10716,6 +10743,7 @@ MonoBehaviour:
   - {fileID: 1517270455}
   - {fileID: 113092623}
   - {fileID: 1901332533}
+  currentBarricade: {fileID: 0}
 --- !u!65 &1658427939
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -11193,6 +11221,7 @@ MonoBehaviour:
   - {fileID: 97041717}
   - {fileID: 883837213}
   - {fileID: 718992811}
+  currentBarricade: {fileID: 0}
 --- !u!65 &1751114627
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -11551,6 +11580,7 @@ MonoBehaviour:
   - {fileID: 737857050}
   - {fileID: 116380574}
   - {fileID: 1600404220}
+  currentBarricade: {fileID: 0}
 --- !u!65 &1803816480
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -11971,6 +12001,7 @@ MonoBehaviour:
   - {fileID: 116868531}
   - {fileID: 730458654}
   - {fileID: 65760921}
+  currentBarricade: {fileID: 0}
 --- !u!65 &1880353646
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -12205,6 +12236,7 @@ MonoBehaviour:
   - {fileID: 1093340683}
   - {fileID: 207634801}
   - {fileID: 745217393}
+  currentBarricade: {fileID: 0}
 --- !u!65 &1898150450
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -12470,6 +12502,7 @@ MonoBehaviour:
   - {fileID: 839476707}
   - {fileID: 1715133980}
   - {fileID: 1715670600}
+  currentBarricade: {fileID: 0}
 --- !u!65 &1924288261
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -12673,6 +12706,7 @@ MonoBehaviour:
   - {fileID: 1924818722}
   - {fileID: 1643631231}
   - {fileID: 649453756}
+  currentBarricade: {fileID: 0}
 --- !u!65 &1941667384
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -12845,6 +12879,7 @@ MonoBehaviour:
   - {fileID: 839304848}
   - {fileID: 1145504953}
   - {fileID: 306502000}
+  currentBarricade: {fileID: 0}
 --- !u!65 &1954918886
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -13079,6 +13114,7 @@ MonoBehaviour:
   - {fileID: 713817339}
   - {fileID: 138167243}
   - {fileID: 1269083160}
+  currentBarricade: {fileID: 0}
 --- !u!65 &2001663858
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -13313,6 +13349,7 @@ MonoBehaviour:
   - {fileID: 1517295848}
   - {fileID: 1113845766}
   - {fileID: 899042681}
+  currentBarricade: {fileID: 0}
 --- !u!65 &2069545257
 BoxCollider:
   m_ObjectHideFlags: 0

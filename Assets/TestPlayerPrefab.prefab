@@ -126,5 +126,7 @@ MonoBehaviour:
   money: 5000
   startingCards:
   - {fileID: 11400000, guid: 228f94ba9c8cf4f348fbd92cd5aa3d57, type: 2}
+  - {fileID: 11400000, guid: fa9dc0e8294af4955bd9f7b2db57742d, type: 2}
   cards: []
   currentGrid: {fileID: 0}
+  remainingFreezeTurns: 0
