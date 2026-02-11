@@ -1,6 +1,7 @@
 using UnityEngine;
 using System.Collections.Generic;
 
+// 确保枚举完整，不影响你的逻辑判断
 public enum GridType { Empty, Bank, Hospital, Prison, Treasure, Shop, Park, Trap, Station }
 
 public class GridNode : MonoBehaviour {
@@ -23,10 +24,11 @@ public class GridNode : MonoBehaviour {
     public Transform[] slotPoints = new Transform[6];
     private List<GameObject> playersInGrid = new List<GameObject>();
 
-    // 修复：添加被 CardSystem 和 PlayerController 引用的方法
+    // 修复：供 CardSystem 和 PlayerController 调用
     public bool HasBarricade() => currentBarricade != null;
     public bool HasBuilding() => currentBuilding != null;
 
+    // 获取当前状态快照，用于保存
     public GridState GetCurrentState() {
         return new GridState {
             gridId = this.gridId,
@@ -36,26 +38,25 @@ public class GridNode : MonoBehaviour {
         };
     }
 
+    // 恢复状态快照
     public void ApplyState(GridState state, List<PlayerController> allPlayers, GameObject housePrefab, GameObject barricadePrefab) {
+        // 1. 恢复所有权
         if (state.ownerId != -1) {
             this.owner = allPlayers.Find(p => p.playerId == state.ownerId);
-            if (this.owner != null) GetComponent<Renderer>().material.color = new Color(0.6f, 1f, 0.6f);
-        } else {
-            this.owner = null;
-            GetComponent<Renderer>().material.color = Color.white;
-        }
-
-        if (state.hasBarricade) {
-            if (currentBarricade == null && barricadePrefab != null) {
-                currentBarricade = Instantiate(barricadePrefab, transform.position, Quaternion.identity);
+            if (this.owner != null) {
+                // 视觉反馈：变色
+                GetComponent<Renderer>().material.color = new Color(0.6f, 1f, 0.6f);
             }
-        } else if (currentBarricade != null) {
-            Destroy(currentBarricade);
-            currentBarricade = null;
         }
 
-        if (state.hasHouse) {
-            if (currentBuilding == null && housePrefab != null) {
+        // 2. 恢复路障
+        if (state.hasBarricade && barricadePrefab != null && currentBarricade == null) {
+            currentBarricade = Instantiate(barricadePrefab, transform.position + Vector3.up * 0.5f, Quaternion.identity);
+        }
+
+        // 3. 恢复房屋
+        if (state.hasHouse && housePrefab != null && buildingAnchor != null) {
+            if (currentBuilding == null) {
                 currentBuilding = Instantiate(housePrefab, buildingAnchor.position, buildingAnchor.rotation);
                 currentBuilding.transform.SetParent(buildingAnchor);
             }
@@ -87,10 +88,6 @@ public class GridNode : MonoBehaviour {
             Gizmos.DrawWireCube(buildingAnchor.position + Vector3.up * 0.75f, new Vector3(1.5f, 1.5f, 1.5f));
             Gizmos.color = Color.white;
             Gizmos.DrawLine(transform.position, buildingAnchor.position);
-        }
-        Gizmos.color = Color.blue;
-        for (int i = 0; i < 4; i++) {
-            if (connections[i] != null) Gizmos.DrawLine(transform.position, connections[i].transform.position);
         }
     }
 }
