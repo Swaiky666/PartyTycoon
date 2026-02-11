@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections;
+using DG.Tweening; 
 
 public class GridEventManager : MonoBehaviour {
     public static GridEventManager Instance;
@@ -15,12 +16,17 @@ public class GridEventManager : MonoBehaviour {
                     UIManager.Instance.ShowActionButton("购买土地", () => {
                         player.ChangeMoney(-node.purchasePrice);
                         node.owner = player;
+                        
+                        // 玩家购买：播放掉落动画
+                        if (node.buildingAnchor != null && GameDataManager.Instance.housePrefab != null) {
+                            StartCoroutine(PlayHouseDropAnimation(node));
+                        }
+
                         node.GetComponent<Renderer>().material.color = new Color(0.6f, 1f, 0.6f); 
                         decisionMade = true;
                     });
 
                     while (!decisionMade) {
-                        // 逻辑：你可以通过ESC键跳过购买，或者在UIManager添加取消按钮
                         if (Input.GetKeyDown(KeyCode.Escape)) decisionMade = true;
                         yield return null;
                     }
@@ -33,6 +39,39 @@ public class GridEventManager : MonoBehaviour {
                 yield return new WaitForSeconds(2.0f);
             }
         }
+        
         onComplete?.Invoke();
+    }
+
+    private IEnumerator PlayHouseDropAnimation(GridNode node) {
+        float height = GameDataManager.Instance.dropHeight;
+        Vector3 targetPos = node.buildingAnchor.position;
+        Vector3 spawnPos = targetPos + Vector3.up * height;
+
+        GameObject house = Instantiate(GameDataManager.Instance.housePrefab, spawnPos, node.buildingAnchor.rotation);
+        node.currentBuilding = house;
+
+        float elapsed = 0f;
+        float duration = 0.8f; 
+
+        while (elapsed < duration) {
+            elapsed += Time.deltaTime;
+            float t = elapsed / duration;
+            // 二次方加速模拟重力
+            float easeT = t * t; 
+            house.transform.position = Vector3.Lerp(spawnPos, targetPos, easeT);
+            yield return null;
+        }
+
+        house.transform.position = targetPos;
+
+        // 触地烟雾粒子
+        if (GameDataManager.Instance.smokeEffectPrefab != null) {
+            GameObject smoke = Instantiate(GameDataManager.Instance.smokeEffectPrefab, targetPos, Quaternion.identity);
+            Destroy(smoke, 3.0f);
+        }
+
+        // 触地视觉反馈：DOTween 震动
+        house.transform.DOShakePosition(0.2f, 0.3f);
     }
 }

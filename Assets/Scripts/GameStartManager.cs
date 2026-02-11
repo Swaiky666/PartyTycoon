@@ -13,24 +13,50 @@ public class GameStartManager : MonoBehaviour {
     private Dictionary<int, int> rollResults = new Dictionary<int, int>();
 
     void Start() {
-        if (gridDatabase) gridDatabase.CleanUp();
-        
-        // 1. 初始化时隐藏除 Status 外的所有 UI
         UIManager.Instance.SetExtraButtonsVisible(false);
         UIManager.Instance.SetPlayerStatsVisible(false);
         
-        InitPlayers();
-        StartCoroutine(MainFlow());
+        InitMapBuildings();
+        CreatePlayerInstances();
+
+        if (GameDataManager.Instance.savedGrids.Count > 0) {
+            GameDataManager.Instance.LoadGameState(players);
+            ToTurnManagerFromLoad();
+        } else {
+            InitPlayersToStart();
+            StartCoroutine(MainFlow());
+        }
     }
 
-    void InitPlayers() {
-        GridNode node = startGrid.GetComponent<GridNode>();
+    void InitMapBuildings() {
+        if (gridDatabase == null) return;
+        foreach (var entry in gridDatabase.allGrids) {
+            GridNode node = entry.node;
+            if (node == null || node.buildingAnchor == null || node.currentBuilding != null) continue;
+
+            GameObject prefab = GameDataManager.Instance.GetFixedBuildingPrefab(node.type);
+            if (prefab != null) {
+                GameObject building = Instantiate(prefab, node.buildingAnchor.position, node.buildingAnchor.rotation);
+                building.transform.SetParent(node.buildingAnchor); 
+                node.currentBuilding = building;
+            }
+        }
+    }
+
+    void CreatePlayerInstances() {
         for (int i = 0; i < 6; i++) {
             GameObject pObj = Instantiate(playerPrefab);
             PlayerController pc = pObj.GetComponent<PlayerController>();
             pc.playerId = i + 1;
-            pc.SetInitialPosition(node);
             players.Add(pc);
+        }
+    }
+
+    void InitPlayersToStart() {
+        if (startGrid == null) return;
+        GridNode node = startGrid.GetComponent<GridNode>();
+        foreach (var p in players) {
+            p.SetInitialPosition(node);
         }
     }
 
@@ -65,15 +91,17 @@ public class GameStartManager : MonoBehaviour {
         if (rollResults.Count >= 6) {
             UIManager.Instance.UpdateStatus("顺序已定，游戏开始！");
             Invoke("ToTurnManager", 2f);
-        } else {
-            UIManager.Instance.UpdateStatus($"等待投掷... ({rollResults.Count}/6)");
         }
     }
 
     void ToTurnManager() {
         var sorted = players.OrderByDescending(p => rollResults[p.playerId]).ToList();
-        // 切换到正式游戏逻辑，TurnManager 会负责重新开启 UI
         TurnManager.Instance.BeginGame(sorted);
-        this.gameObject.SetActive(false); 
+        gameObject.SetActive(false);
+    }
+
+    void ToTurnManagerFromLoad() {
+        TurnManager.Instance.BeginGame(players);
+        gameObject.SetActive(false);
     }
 }

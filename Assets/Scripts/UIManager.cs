@@ -2,18 +2,20 @@ using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
 using System;
+using System.Collections.Generic;
 
 public class UIManager : MonoBehaviour {
     public static UIManager Instance;
 
     [Header("公共 UI 组件")]
     public TextMeshProUGUI globalStatusText; 
-    public TextMeshProUGUI playerStatsText; // 玩家金币/信息文本
+    public TextMeshProUGUI playerStatsText; 
     public Button actionButton;              
 
     [Header("功能切换按钮")]
     public Button viewButton;  
-    public Button cardButton;  
+    public Button cardButton;
+    public Button testSwitchSceneButton; 
 
     private TextMeshProUGUI buttonText;      
 
@@ -22,28 +24,35 @@ public class UIManager : MonoBehaviour {
         if (actionButton != null) {
             buttonText = actionButton.GetComponentInChildren<TextMeshProUGUI>();
         }
+
+        if (testSwitchSceneButton != null) {
+            testSwitchSceneButton.onClick.AddListener(OnTestSwitchClicked);
+        }
     }
 
-    // 更新上方通知信息
+    private void OnTestSwitchClicked() {
+        // 修复：确保 TurnManager 中定义了 allPlayers 变量
+        if (TurnManager.Instance != null && TurnManager.Instance.allPlayers != null) {
+            GameDataManager.Instance.SwitchToMinigame("MinigameScene", TurnManager.Instance.allPlayers);
+        } else {
+            Debug.LogError("UIManager: 无法找到玩家列表，请检查 TurnManager.allPlayers 是否公开。");
+        }
+    }
+
     public void UpdateStatus(string message) {
         if (globalStatusText != null) globalStatusText.text = message;
     }
 
-    // 更新并显示玩家资产
     public void UpdatePlayerStats(PlayerController p) {
         if (playerStatsText != null) {
             playerStatsText.text = $"玩家 {p.playerId} | 金币: <color=yellow>${p.money}</color>";
         }
     }
 
-    // 核心修改：控制玩家信息文本的显隐
     public void SetPlayerStatsVisible(bool visible) {
-        if (playerStatsText != null) {
-            playerStatsText.gameObject.SetActive(visible);
-        }
+        if (playerStatsText != null) playerStatsText.gameObject.SetActive(visible);
     }
 
-    // 配置万能按钮
     public void ShowActionButton(string label, Action callback) {
         if (actionButton == null) return;
         actionButton.gameObject.SetActive(true);
@@ -56,17 +65,24 @@ public class UIManager : MonoBehaviour {
         if (actionButton != null) actionButton.gameObject.SetActive(false);
     }
 
-    // 控制侧边功能按钮显隐
     public void SetExtraButtonsVisible(bool visible) {
         if(viewButton) viewButton.gameObject.SetActive(visible);
         if(cardButton) cardButton.gameObject.SetActive(visible);
+        if(testSwitchSceneButton) testSwitchSceneButton.gameObject.SetActive(visible);
     }
 
+    // 修复：补全 TurnManager 引用的缺失方法
     public void SetViewButtonLabel(string label) {
-        if(viewButton) viewButton.GetComponentInChildren<TextMeshProUGUI>().text = label;
+        if(viewButton != null) {
+            var txt = viewButton.GetComponentInChildren<TextMeshProUGUI>();
+            if(txt != null) txt.text = label;
+        }
     }
 
     public void SetCardButtonLabel(string label) {
-        if(cardButton) cardButton.GetComponentInChildren<TextMeshProUGUI>().text = label;
+        if(cardButton != null) {
+            var txt = cardButton.GetComponentInChildren<TextMeshProUGUI>();
+            if(txt != null) txt.text = label;
+        }
     }
 }

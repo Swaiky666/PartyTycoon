@@ -8,6 +8,9 @@ public class TurnManager : MonoBehaviour {
     [Header("引用")]
     public DiceAnimator diceAnimator; 
     
+    // --- 仅在此处新增一个属性，用于场景切换时获取玩家数据，不改变原有逻辑 ---
+    public List<PlayerController> allPlayers => turnOrder;
+
     private List<PlayerController> turnOrder;
     private int currentIndex = 0;
     private bool isGameActive = false;

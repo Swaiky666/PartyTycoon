@@ -13,6 +13,8 @@ MonoBehaviour:
   m_Name: GridDatabase
   m_EditorClassIdentifier: 
   allGrids:
+  - id: 0
+    node: {fileID: 0}
   - id: 1
     node: {fileID: 0}
   - id: 2
@@ -26,48 +28,4 @@ MonoBehaviour:
   - id: 6
     node: {fileID: 0}
   - id: 7
-    node: {fileID: 0}
-  - id: 8
-    node: {fileID: 0}
-  - id: 9
-    node: {fileID: 0}
-  - id: 10
-    node: {fileID: 0}
-  - id: 11
-    node: {fileID: 0}
-  - id: 12
-    node: {fileID: 0}
-  - id: 13
-    node: {fileID: 0}
-  - id: 14
-    node: {fileID: 0}
-  - id: 15
-    node: {fileID: 0}
-  - id: 16
-    node: {fileID: 0}
-  - id: 17
-    node: {fileID: 0}
-  - id: 18
-    node: {fileID: 0}
-  - id: 19
-    node: {fileID: 0}
-  - id: 20
-    node: {fileID: 0}
-  - id: 21
-    node: {fileID: 0}
-  - id: 22
-    node: {fileID: 0}
-  - id: 23
-    node: {fileID: 0}
-  - id: 24
-    node: {fileID: 0}
-  - id: 25
-    node: {fileID: 0}
-  - id: 26
-    node: {fileID: 0}
-  - id: 27
-    node: {fileID: 0}
-  - id: 28
-    node: {fileID: 0}
-  - id: 29
     node: {fileID: 0}

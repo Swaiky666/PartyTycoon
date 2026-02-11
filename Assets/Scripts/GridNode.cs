@@ -13,18 +13,54 @@ public class GridNode : MonoBehaviour {
     public int rentPrice = 200;
     public PlayerController owner = null;
 
-    [Header("四向连接 (0:北, 1:东, 2:南, 3:西)")]
-    public GridNode[] connections = new GridNode[4]; 
+    [Header("建筑配置")]
+    public Transform buildingAnchor;    
+    public GameObject currentBuilding;   
 
-    [Header("6人站位锚点")]
+    [Header("运行时状态")]
+    public GameObject currentBarricade; 
+    public GridNode[] connections = new GridNode[4]; 
     public Transform[] slotPoints = new Transform[6];
     private List<GameObject> playersInGrid = new List<GameObject>();
 
-    // --- 新增：路障运行时引用 ---
-    [Header("运行时状态")]
-    public GameObject currentBarricade; 
-
+    // 修复：添加被 CardSystem 和 PlayerController 引用的方法
     public bool HasBarricade() => currentBarricade != null;
+    public bool HasBuilding() => currentBuilding != null;
+
+    public GridState GetCurrentState() {
+        return new GridState {
+            gridId = this.gridId,
+            ownerId = this.owner != null ? this.owner.playerId : -1,
+            hasBarricade = this.currentBarricade != null,
+            hasHouse = (this.type == GridType.Empty && this.currentBuilding != null)
+        };
+    }
+
+    public void ApplyState(GridState state, List<PlayerController> allPlayers, GameObject housePrefab, GameObject barricadePrefab) {
+        if (state.ownerId != -1) {
+            this.owner = allPlayers.Find(p => p.playerId == state.ownerId);
+            if (this.owner != null) GetComponent<Renderer>().material.color = new Color(0.6f, 1f, 0.6f);
+        } else {
+            this.owner = null;
+            GetComponent<Renderer>().material.color = Color.white;
+        }
+
+        if (state.hasBarricade) {
+            if (currentBarricade == null && barricadePrefab != null) {
+                currentBarricade = Instantiate(barricadePrefab, transform.position, Quaternion.identity);
+            }
+        } else if (currentBarricade != null) {
+            Destroy(currentBarricade);
+            currentBarricade = null;
+        }
+
+        if (state.hasHouse) {
+            if (currentBuilding == null && housePrefab != null) {
+                currentBuilding = Instantiate(housePrefab, buildingAnchor.position, buildingAnchor.rotation);
+                currentBuilding.transform.SetParent(buildingAnchor);
+            }
+        }
+    }
 
     public void ClearBarricade() {
         if (currentBarricade != null) {
@@ -32,8 +68,6 @@ public class GridNode : MonoBehaviour {
             currentBarricade = null;
         }
     }
-
-    public static int GetOppositeDirection(int dir) { return (dir + 2) % 4; }
 
     public Vector3 GetSlotPosition(GameObject player) {
         if (!playersInGrid.Contains(player)) playersInGrid.Add(player);
@@ -43,15 +77,20 @@ public class GridNode : MonoBehaviour {
         return transform.position;
     }
 
-    public void RemovePlayer(GameObject player) { playersInGrid.Remove(player); }
+    public void RemovePlayer(GameObject player) {
+        if (playersInGrid.Contains(player)) playersInGrid.Remove(player);
+    }
 
     private void OnDrawGizmos() {
-        Color[] dirColors = { Color.blue, Color.red, Color.yellow, Color.green };
+        if (buildingAnchor != null) {
+            Gizmos.color = (owner == null) ? Color.cyan : Color.green;
+            Gizmos.DrawWireCube(buildingAnchor.position + Vector3.up * 0.75f, new Vector3(1.5f, 1.5f, 1.5f));
+            Gizmos.color = Color.white;
+            Gizmos.DrawLine(transform.position, buildingAnchor.position);
+        }
+        Gizmos.color = Color.blue;
         for (int i = 0; i < 4; i++) {
-            if (connections[i] != null) {
-                Gizmos.color = dirColors[i];
-                Gizmos.DrawLine(transform.position, connections[i].transform.position);
-            }
+            if (connections[i] != null) Gizmos.DrawLine(transform.position, connections[i].transform.position);
         }
     }
 }
