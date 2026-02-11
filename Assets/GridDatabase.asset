@@ -15,8 +15,6 @@ MonoBehaviour:
   allGrids:
   - id: 1
     node: {fileID: 0}
-  - id: 1
-    node: {fileID: 0}
   - id: 2
     node: {fileID: 0}
   - id: 3
@@ -61,8 +59,6 @@ MonoBehaviour:
     node: {fileID: 0}
   - id: 23
     node: {fileID: 0}
-  - id: 23
-    node: {fileID: 0}
   - id: 24
     node: {fileID: 0}
   - id: 25
@@ -74,12 +70,4 @@ MonoBehaviour:
   - id: 28
     node: {fileID: 0}
   - id: 29
-    node: {fileID: 0}
-  - id: 30
-    node: {fileID: 0}
-  - id: 31
-    node: {fileID: 0}
-  - id: 32
-    node: {fileID: 0}
-  - id: 33
     node: {fileID: 0}
