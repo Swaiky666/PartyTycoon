@@ -23,13 +23,12 @@ public class PlayerController : MonoBehaviour {
         foreach (var c in startingCards) if (c != null) cards.Add(Instantiate(c));
     }
 
-    // --- 冰冻逻辑 ---
     public void ApplyFreeze(int turns, GameObject prefab) {
         remainingFreezeTurns = turns;
         if (currentIceVisual == null && prefab != null) {
             currentIceVisual = Instantiate(prefab, transform.position, Quaternion.identity, transform);
+            currentIceVisual.transform.SetParent(this.transform);
         }
-        // 视觉提示：变蓝
         SetModelColor(Color.cyan);
     }
 
@@ -38,7 +37,7 @@ public class PlayerController : MonoBehaviour {
             remainingFreezeTurns--;
             UIManager.Instance.UpdateStatus($"玩家 {playerId} 被冰冻，剩余 {remainingFreezeTurns} 回合");
             if (remainingFreezeTurns <= 0) Unfreeze();
-            return true; // 冰冻中，跳过回合
+            return true; 
         }
         return false;
     }
@@ -51,15 +50,47 @@ public class PlayerController : MonoBehaviour {
 
     private void SetModelColor(Color color) {
         Renderer[] rs = GetComponentsInChildren<Renderer>();
-        foreach (var r in rs) r.material.color = color;
+        foreach (var r in rs) if (r != null) r.material.color = color;
     }
 
-    // --- 移动逻辑 ---
+    public void SetInitialPosition(GridNode node) {
+        if (node == null) return;
+        currentGrid = node;
+        StopAllCoroutines();
+
+        float finalOffset = (heightOffset <= 0) ? 0.5f : heightOffset;
+        Vector3 slotPos = node.GetSlotPosition(this.gameObject);
+        Vector3 finalPos = new Vector3(slotPos.x, slotPos.y + finalOffset, slotPos.z);
+        
+        transform.position = finalPos;
+        
+        Rigidbody rb = GetComponent<Rigidbody>();
+        if (rb != null) {
+            rb.velocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+            rb.isKinematic = true; 
+            StartCoroutine(RestorePhysics(rb));
+        }
+
+        Physics.SyncTransforms();
+        Debug.Log($"【系统】玩家 {playerId} 已定位至地块 {node.gridId}");
+    }
+
+    private IEnumerator RestorePhysics(Rigidbody rb) {
+        yield return new WaitForFixedUpdate();
+        if (rb != null) rb.isKinematic = false;
+    }
+
     public void StartMoving(int steps, System.Action onComplete) {
         StartCoroutine(MoveRoutine(steps, onComplete));
     }
 
     private IEnumerator MoveRoutine(int steps, System.Action onComplete) {
+        if (currentGrid == null) {
+            onComplete?.Invoke();
+            yield break;
+        }
+
         int remainingSteps = steps;
         while (remainingSteps > 0) {
             List<GridNode> validOptions = new List<GridNode>();
@@ -81,14 +112,13 @@ public class PlayerController : MonoBehaviour {
                 currentGrid = nextNode;
                 remainingSteps--;
 
-                // 路障检测
                 if (currentGrid.HasBarricade()) {
                     currentGrid.ClearBarricade();
-                    remainingSteps = 0;
+                    UIManager.Instance.UpdateStatus("撞到路障！停止移动。");
                     break;
                 }
             } else break;
-            yield return new WaitForSeconds(0.1f);
+            yield return new WaitForSeconds(0.05f);
         }
         onComplete?.Invoke();
     }
@@ -100,6 +130,7 @@ public class PlayerController : MonoBehaviour {
             Vector3 diff = node.transform.position - currentGrid.transform.position;
             Quaternion rot = Quaternion.identity;
             Vector3 offset = Vector3.zero;
+            
             if (Mathf.Abs(diff.x) > Mathf.Abs(diff.z)) {
                 if (diff.x > 0) { rot = Quaternion.Euler(0, 90, 0); offset = new Vector3(1.3f, 0, 0); }
                 else { rot = Quaternion.Euler(0, -90, 0); offset = new Vector3(-1.3f, 0, 0); }
@@ -107,6 +138,7 @@ public class PlayerController : MonoBehaviour {
                 if (diff.z > 0) { rot = Quaternion.Euler(0, 0, 0); offset = new Vector3(0, 0, 1.3f); }
                 else { rot = Quaternion.Euler(0, 180, 0); offset = new Vector3(0, 0, -1.3f); }
             }
+
             GameObject arrow = Instantiate(arrowPrefab, currentGrid.transform.position + Vector3.up * 0.7f + offset, rot);
             arrow.transform.Rotate(90, 0, 0); 
             arrow.GetComponent<ArrowClicker>().Setup(node, (t) => chosenNode = t);
@@ -118,7 +150,10 @@ public class PlayerController : MonoBehaviour {
     }
 
     private IEnumerator MoveToNode(GridNode targetNode) {
-        Vector3 targetPos = GetPosWithHeight(targetNode.GetSlotPosition(this.gameObject));
+        float safeOffset = (heightOffset <= 0) ? 0.5f : heightOffset;
+        Vector3 targetPos = targetNode.GetSlotPosition(this.gameObject);
+        targetPos.y += safeOffset;
+
         while (Vector3.Distance(transform.position, targetPos) > 0.01f) {
             transform.position = Vector3.MoveTowards(transform.position, targetPos, moveSpeed * Time.deltaTime);
             Vector3 dir = (targetPos - transform.position).normalized;
@@ -128,7 +163,8 @@ public class PlayerController : MonoBehaviour {
         transform.position = targetPos;
     }
 
-    public void ChangeMoney(int amount) { money += amount; UIManager.Instance.UpdatePlayerStats(this); }
-    public void SetInitialPosition(GridNode node) { currentGrid = node; transform.position = GetPosWithHeight(node.GetSlotPosition(this.gameObject)); }
-    public Vector3 GetPosWithHeight(Vector3 b) => new Vector3(b.x, b.y + heightOffset, b.z);
+    public void ChangeMoney(int amount) { 
+        money += amount; 
+        UIManager.Instance.UpdatePlayerStats(this); 
+    }
 }

@@ -16,13 +16,21 @@ public class GameStartManager : MonoBehaviour {
         UIManager.Instance.SetExtraButtonsVisible(false);
         UIManager.Instance.SetPlayerStatsVisible(false);
         
+        // 1. 初始化地图（现在使用新数据库的扫描方法）
         InitMapBuildings();
+        
+        // 2. 生成玩家实例
         CreatePlayerInstances();
 
-        if (GameDataManager.Instance.savedGrids.Count > 0) {
+        // 3. 核心逻辑：判断是新游戏还是从小游戏返回
+        if (GameDataManager.Instance != null && GameDataManager.Instance.savedPlayers.Count > 0) {
+            // 加载存档：这会设置玩家的 currentGrid 并归位
             GameDataManager.Instance.LoadGameState(players);
-            ToTurnManagerFromLoad();
+            
+            // 加载后直接进入回合管理
+            ToTurnManagerFromLoad(); 
         } else {
+            // 只有新游戏才跑初始定位和开场流程
             InitPlayersToStart();
             StartCoroutine(MainFlow());
         }
@@ -30,10 +38,14 @@ public class GameStartManager : MonoBehaviour {
 
     void InitMapBuildings() {
         if (gridDatabase == null) return;
-        foreach (var entry in gridDatabase.allGrids) {
-            GridNode node = entry.node;
+
+        // 核心修复：调用 GetAllNodes() 替代已删除的 allGrids
+        List<GridNode> allNodes = gridDatabase.GetAllNodes();
+        
+        foreach (GridNode node in allNodes) {
             if (node == null || node.buildingAnchor == null || node.currentBuilding != null) continue;
 
+            // 根据地块类型（商店、银行等）生成固定建筑
             GameObject prefab = GameDataManager.Instance.GetFixedBuildingPrefab(node.type);
             if (prefab != null) {
                 GameObject building = Instantiate(prefab, node.buildingAnchor.position, node.buildingAnchor.rotation);
@@ -44,11 +56,12 @@ public class GameStartManager : MonoBehaviour {
     }
 
     void CreatePlayerInstances() {
-        for (int i = 0; i < 6; i++) {
-            GameObject pObj = Instantiate(playerPrefab);
-            PlayerController pc = pObj.GetComponent<PlayerController>();
-            pc.playerId = i + 1;
-            players.Add(pc);
+        for (int i = 1; i <= 6; i++) {
+            GameObject go = Instantiate(playerPrefab);
+            PlayerController p = go.GetComponent<PlayerController>();
+            p.playerId = i;
+            players.Add(p);
+            UIManager.Instance.UpdatePlayerStats(p);
         }
     }
 
@@ -63,6 +76,7 @@ public class GameStartManager : MonoBehaviour {
     IEnumerator MainFlow() {
         UIManager.Instance.UpdateStatus("准备决定顺序...");
         yield return new WaitForSeconds(1.0f);
+        diceAnimator.ShowDice(true);
         diceAnimator.ShowAndIdle();
         
         UIManager.Instance.ShowActionButton("决定顺序", () => {
@@ -101,6 +115,7 @@ public class GameStartManager : MonoBehaviour {
     }
 
     void ToTurnManagerFromLoad() {
+        // 从存档加载时，默认按玩家ID顺序开始
         TurnManager.Instance.BeginGame(players);
         gameObject.SetActive(false);
     }

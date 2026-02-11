@@ -1,3 +1,4 @@
+#if UNITY_EDITOR
 using UnityEngine;
 using UnityEditor;
 using System.Collections.Generic;
@@ -51,12 +52,7 @@ public class GridAutoLinker : EditorWindow {
 
         Undo.RecordObjects(selected, "Reset and Replan");
 
-        // 全局占用字典：记录哪些坐标被占了 (Vector2Int -> 是否是地板)
-        // 我们用这个来确保“一个萝卜一个坑”
         HashSet<Vector2Int> occupiedSlots = new HashSet<Vector2Int>();
-
-        // --- 第一步：先规划地板位置 ---
-        // 排序：按当前位置排序，尽量保持玩家预想的布局
         System.Array.Sort(selected, (a, b) => a.transform.position.sqrMagnitude.CompareTo(b.transform.position.sqrMagnitude));
 
         List<GridNode> nodesToProcess = new List<GridNode>();
@@ -67,54 +63,38 @@ public class GridAutoLinker : EditorWindow {
             nodesToProcess.Add(node);
 
             Undo.RecordObject(obj.transform, "Snap Tile");
-
-            // 计算地板理想网格位
             Vector2Int tileGridPos = GetGridPos(obj.transform.position);
 
-            // 如果该位被占了，地板之间互相挤开
             if (occupiedSlots.Contains(tileGridPos)) {
                 tileGridPos = FindEmptySlot(tileGridPos, occupiedSlots);
             }
             
-            // 记录地板占用
             occupiedSlots.Add(tileGridPos);
             obj.transform.position = GridToWorld(tileGridPos);
         }
 
-        // --- 第二步：在地板周围生成/规划蓝色选框 ---
         foreach (var node in nodesToProcess) {
             if (node.buildingAnchor == null) continue;
 
             Undo.RecordObject(node.buildingAnchor, "Snap Anchor");
-
-            // 获取当前地板的网格坐标
             Vector2Int tileGridPos = GetGridPos(node.transform.position);
-
-            // 寻找周围可以放选框的邻居位 (上下左右)
             Vector2Int anchorGridPos = FindBestNeighborSlot(tileGridPos, occupiedSlots);
-
-            // 记录选框占用，防止下一个选框叠上来
             occupiedSlots.Add(anchorGridPos);
 
-            // 设置选框世界坐标
             node.buildingAnchor.position = GridToWorld(anchorGridPos);
             
-            // 高度微调（略高于地板防止闪烁）
             Vector3 lp = node.buildingAnchor.localPosition;
             lp.y = 0.2f; 
             node.buildingAnchor.localPosition = lp;
         }
 
-        Debug.Log("【初始化完成】已优先排布地板，并在空余位置挤开了蓝色选框。");
+        Debug.Log("【工具】初始化完成：已重新排布地块和选框。");
     }
 
-    // 坐标转换辅助
     private Vector2Int GetGridPos(Vector3 pos) => new Vector2Int(Mathf.RoundToInt(pos.x / gridStep), Mathf.RoundToInt(pos.z / gridStep));
     private Vector3 GridToWorld(Vector2Int gPos) => new Vector3(gPos.x * gridStep, 0, gPos.y * gridStep);
 
-    // 寻找邻居空位逻辑：优先上下左右，如果都满了，就找更远一点的
     private Vector2Int FindBestNeighborSlot(Vector2Int center, HashSet<Vector2Int> occupied) {
-        // 优先顺序：前、后、左、右
         Vector2Int[] neighbors = {
             center + new Vector2Int(0, 1),
             center + new Vector2Int(0, -1),
@@ -125,12 +105,9 @@ public class GridAutoLinker : EditorWindow {
         foreach (var pos in neighbors) {
             if (!occupied.Contains(pos)) return pos;
         }
-
-        // 如果上下左右都满了，调用更广范围的搜索
         return FindEmptySlot(center, occupied);
     }
 
-    // 螺旋算法：寻找最近的完全空白格
     private Vector2Int FindEmptySlot(Vector2Int start, HashSet<Vector2Int> occupied) {
         int r = 1;
         while (r < 100) {
@@ -146,7 +123,6 @@ public class GridAutoLinker : EditorWindow {
         return start;
     }
 
-    // --- 以下保持 Link 和 Slots 逻辑不变 ---
     private void LinkNodes() {
         GridNode[] allNodes = GameObject.FindObjectsOfType<GridNode>();
         foreach (var nA in allNodes) {
@@ -156,11 +132,20 @@ public class GridAutoLinker : EditorWindow {
                 if (nA == nB) continue;
                 Vector3 diff = nB.transform.position - nA.transform.position;
                 if (diff.magnitude > gridStep * 1.1f) continue;
-                int dir = Mathf.Abs(diff.x) > Mathf.Abs(diff.z) ? (diff.x > 0 ? 1 : 3) : (diff.z > 0 ? 0 : 2);
-                nA.connections[dir] = nB;
+                
+                // 自动连接上下左右 4 个方向
+                int dir = -1;
+                if (Mathf.Abs(diff.x) > Mathf.Abs(diff.z)) {
+                    dir = diff.x > 0 ? 1 : 3;
+                } else {
+                    dir = diff.z > 0 ? 0 : 2;
+                }
+                
+                if (dir != -1) nA.connections[dir] = nB;
             }
             EditorUtility.SetDirty(nA);
         }
+        Debug.Log("【工具】路径自动连接完成。");
     }
 
     private void ManageSlots() {
@@ -180,21 +165,33 @@ public class GridAutoLinker : EditorWindow {
             }
             EditorUtility.SetDirty(node);
         }
+        Debug.Log("【工具】角色站位 Slot 配置完成。");
     }
 
+    // --- 核心修复：不再操作 db.allGrids 列表 ---
     private void SyncAllToDatabase() {
-        if (db == null) return;
-        Undo.RecordObject(db, "Sync Database");
-        db.allGrids.Clear();
-        GridNode[] allNodes = GameObject.FindObjectsOfType<GridNode>();
-        int currentId = 0;
-        foreach (var n in allNodes) {
-            n.gridId = currentId;
-            db.allGrids.Add(new GridDatabase.GridEntry { id = currentId, node = n });
-            EditorUtility.SetDirty(n);
-            currentId++;
+        if (db == null) {
+            Debug.LogError("【工具】未指定 GridDatabase，同步失败！");
+            return;
         }
+
+        GridNode[] allNodes = GameObject.FindObjectsOfType<GridNode>();
+        
+        // 1. 给场景中的地块分配唯一 ID
+        for (int i = 0; i < allNodes.Length; i++) {
+            Undo.RecordObject(allNodes[i], "Assign Grid ID");
+            allNodes[i].gridId = i;
+            EditorUtility.SetDirty(allNodes[i]);
+        }
+
+        // 2. 调用数据库的刷新方法，让它通过 FindObjectsOfType 自动建立内存映射
+        db.RefreshCache();
+
+        // 3. 标记数据库已变动（虽然现在是动态缓存，但养成 SetDirty 习惯防止 SO 某些持久化字段未保存）
         EditorUtility.SetDirty(db);
         AssetDatabase.SaveAssets();
+
+        Debug.Log($"【工具】同步成功：已为 {allNodes.Length} 个地块分配 ID 并刷新数据库映射。");
     }
 }
+#endif

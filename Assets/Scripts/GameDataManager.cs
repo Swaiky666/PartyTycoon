@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine.SceneManagement;
 
+// --- 必须保留这些类定义，否则会报 CS0246 错误 ---
 [System.Serializable]
 public class PlayerState {
     public int playerId;
@@ -50,7 +51,6 @@ public class GameDataManager : MonoBehaviour {
         if (Instance == null) { 
             Instance = this; 
             DontDestroyOnLoad(gameObject); 
-            // 删除了这里的 SyncDatabaseOnStart()，防止回城时误删 ID
         } else {
             Destroy(gameObject);
         }
@@ -72,6 +72,8 @@ public class GameDataManager : MonoBehaviour {
     }
 
     public void SaveGameState(List<PlayerController> players) {
+        if (database != null) database.RefreshCache();
+
         savedPlayers.Clear();
         savedGrids.Clear();
 
@@ -80,7 +82,6 @@ public class GameDataManager : MonoBehaviour {
             return;
         }
 
-        // 1. 保存玩家
         foreach (var p in players) {
             PlayerState s = new PlayerState {
                 playerId = p.playerId,
@@ -92,55 +93,58 @@ public class GameDataManager : MonoBehaviour {
             savedPlayers.Add(s);
         }
 
-        // 2. 保存地块
         GridNode[] allSceneNodes = GameObject.FindObjectsOfType<GridNode>();
         foreach (var node in allSceneNodes) {
             if (node.gridId != -1) {
                 savedGrids.Add(node.GetCurrentState());
             }
         }
-        Debug.Log($"【系统】存入缓存完成：玩家 {savedPlayers.Count}，地块 {savedGrids.Count}。");
+        Debug.Log($"【系统】数据存入缓存完成：玩家 {savedPlayers.Count}，地块 {savedGrids.Count}。");
     }
 
     public void LoadGameState(List<PlayerController> players) {
+        if (database != null) database.RefreshCache();
+
         if (savedPlayers.Count == 0 || database == null) {
-            Debug.LogWarning("【系统】没有找到存档数据，将以新游戏模式启动。");
+            Debug.LogWarning("【系统】没有找到存档数据。");
             return;
         }
 
-        Debug.Log($"【系统】开始恢复数据：地块数 {savedGrids.Count}");
-
-        // 恢复玩家
-        foreach (var state in savedPlayers) {
-            PlayerController p = players.Find(x => x.playerId == state.playerId);
-            if (p != null) {
-                p.money = state.money;
-                p.remainingFreezeTurns = state.freezeTurns;
-                
-                GridNode node = database.GetGridById(state.currentGridId);
-                if (node != null) p.SetInitialPosition(node);
-                
-                p.cards.Clear();
-                foreach (string cName in state.cardNames) {
-                    CardBase refCard = allPossibleCards.Find(c => c.cardName == cName);
-                    if (refCard != null) p.cards.Add(Instantiate(refCard));
-                }
-            }
-        }
-
-        // 恢复地块
         foreach (var gState in savedGrids) {
             GridNode node = database.GetGridById(gState.gridId);
             if (node != null) {
                 node.ApplyState(gState, players, housePrefab, barricadePrefab);
             }
         }
-        
-        // 注意：这里不再立即 Clear，确保所有脚本都加载完了再说
+
+        foreach (var state in savedPlayers) {
+            PlayerController p = players.Find(x => x.playerId == state.playerId);
+            if (p != null) {
+                p.money = state.money;
+                p.remainingFreezeTurns = state.freezeTurns;
+                
+                p.cards.Clear();
+                foreach (string cName in state.cardNames) {
+                    CardBase refCard = allPossibleCards.Find(c => c.cardName == cName);
+                    if (refCard != null) p.cards.Add(Instantiate(refCard));
+                }
+
+                GridNode node = database.GetGridById(state.currentGridId);
+                if (node != null) {
+                    p.currentGrid = node;
+                    p.SetInitialPosition(node);
+                }
+
+                if (state.freezeTurns > 0 && iceEffectPrefab != null) {
+                    p.ApplyFreeze(state.freezeTurns, iceEffectPrefab);
+                }
+            }
+        }
+
         Debug.Log("【系统】数据恢复成功！");
+        ClearCache();
     }
 
-    // 新增：提供一个手动清理缓存的方法，在游戏真正退出或彻底重开时调用
     public void ClearCache() {
         savedPlayers.Clear();
         savedGrids.Clear();

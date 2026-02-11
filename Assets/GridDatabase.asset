@@ -12,20 +12,3 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: efea3799f7415486ca2e83762f707c09, type: 3}
   m_Name: GridDatabase
   m_EditorClassIdentifier: 
-  allGrids:
-  - id: 0
-    node: {fileID: 0}
-  - id: 1
-    node: {fileID: 0}
-  - id: 2
-    node: {fileID: 0}
-  - id: 3
-    node: {fileID: 0}
-  - id: 4
-    node: {fileID: 0}
-  - id: 5
-    node: {fileID: 0}
-  - id: 6
-    node: {fileID: 0}
-  - id: 7
-    node: {fileID: 0}
