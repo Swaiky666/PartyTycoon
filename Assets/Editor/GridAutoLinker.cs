@@ -34,6 +34,9 @@ public class GridAutoLinker : EditorWindow {
 
         GUI.color = Color.cyan;
         if (GUILayout.Button("【初始化】先排地板 -> 再挤开选框")) ResetAndReplan();
+        
+        GUI.color = Color.yellow;
+        if (GUILayout.Button("【重置】删除并重新生成 BuildingAnchor")) ForceRebuildAnchors();
         GUI.color = Color.white;
 
         EditorGUILayout.Space();
@@ -46,65 +49,91 @@ public class GridAutoLinker : EditorWindow {
         if (GUILayout.Button("同步所有地块到数据库")) SyncAllToDatabase();
     }
 
-    private void ResetAndReplan() {
+    private void ForceRebuildAnchors() {
         GameObject[] selected = Selection.gameObjects;
         if (selected.Length == 0) return;
 
-        Undo.RecordObjects(selected, "Reset and Replan");
+        HashSet<Vector2Int> occupiedSlots = new HashSet<Vector2Int>();
+        GridNode[] allNodes = GameObject.FindObjectsOfType<GridNode>();
+        foreach (var n in allNodes) occupiedSlots.Add(GetGridPos(n.transform.position));
 
+        foreach (GameObject obj in selected) {
+            GridNode node = obj.GetComponent<GridNode>();
+            if (node == null) continue;
+
+            Transform oldAnchor = obj.transform.Find("BuildingAnchor");
+            if (oldAnchor != null) Undo.DestroyObjectImmediate(oldAnchor.gameObject);
+
+            Vector2Int tileGridPos = GetGridPos(obj.transform.position);
+            Vector2Int anchorGridPos = FindBestNeighborSlot(tileGridPos, occupiedSlots);
+            occupiedSlots.Add(anchorGridPos);
+
+            GameObject newAnchor = new GameObject("BuildingAnchor");
+            Undo.RegisterCreatedObjectUndo(newAnchor, "Create Anchor");
+            newAnchor.transform.SetParent(obj.transform);
+            newAnchor.transform.position = GridToWorld(anchorGridPos);
+            
+            // --- 核心修正：朝向当前地板 ---
+            // 1. 设置高度偏移
+            Vector3 lp = newAnchor.transform.localPosition;
+            lp.y = 0.2f; 
+            newAnchor.transform.localPosition = lp;
+
+            // 2. 让锚点注视地块中心 (LookAt)
+            // 我们通过 LookAt 地块的世界坐标，然后旋转 180 度（因为模型正面通常是 Z 轴正方向）
+            newAnchor.transform.LookAt(obj.transform.position);
+            // 如果你的模型导入时正面反了，可以根据需要调整下面这一行代码：
+            // newAnchor.transform.Rotate(0, 180, 0); 
+
+            Undo.RecordObject(node, "Link New Anchor");
+            node.buildingAnchor = newAnchor.transform;
+            EditorUtility.SetDirty(node);
+        }
+        Debug.Log("【工具】建筑选框已重置，且朝向已自动对准地块。");
+    }
+
+    private void ResetAndReplan() {
+        // ... 原有的地块排布逻辑不变 ...
+        GameObject[] selected = Selection.gameObjects;
+        if (selected.Length == 0) return;
+        Undo.RecordObjects(selected, "Reset and Replan");
         HashSet<Vector2Int> occupiedSlots = new HashSet<Vector2Int>();
         System.Array.Sort(selected, (a, b) => a.transform.position.sqrMagnitude.CompareTo(b.transform.position.sqrMagnitude));
-
         List<GridNode> nodesToProcess = new List<GridNode>();
-
         foreach (var obj in selected) {
             GridNode node = obj.GetComponent<GridNode>();
             if (!node) continue;
             nodesToProcess.Add(node);
-
             Undo.RecordObject(obj.transform, "Snap Tile");
             Vector2Int tileGridPos = GetGridPos(obj.transform.position);
-
-            if (occupiedSlots.Contains(tileGridPos)) {
-                tileGridPos = FindEmptySlot(tileGridPos, occupiedSlots);
-            }
-            
+            if (occupiedSlots.Contains(tileGridPos)) tileGridPos = FindEmptySlot(tileGridPos, occupiedSlots);
             occupiedSlots.Add(tileGridPos);
             obj.transform.position = GridToWorld(tileGridPos);
         }
 
         foreach (var node in nodesToProcess) {
             if (node.buildingAnchor == null) continue;
-
             Undo.RecordObject(node.buildingAnchor, "Snap Anchor");
             Vector2Int tileGridPos = GetGridPos(node.transform.position);
             Vector2Int anchorGridPos = FindBestNeighborSlot(tileGridPos, occupiedSlots);
             occupiedSlots.Add(anchorGridPos);
-
             node.buildingAnchor.position = GridToWorld(anchorGridPos);
             
+            // 在排布逻辑里也加入注视
+            node.buildingAnchor.LookAt(node.transform.position);
             Vector3 lp = node.buildingAnchor.localPosition;
             lp.y = 0.2f; 
             node.buildingAnchor.localPosition = lp;
         }
-
-        Debug.Log("【工具】初始化完成：已重新排布地块和选框。");
+        Debug.Log("【工具】初始化完成：已重新排布地块和选框（含自动对齐朝向）。");
     }
 
     private Vector2Int GetGridPos(Vector3 pos) => new Vector2Int(Mathf.RoundToInt(pos.x / gridStep), Mathf.RoundToInt(pos.z / gridStep));
     private Vector3 GridToWorld(Vector2Int gPos) => new Vector3(gPos.x * gridStep, 0, gPos.y * gridStep);
 
     private Vector2Int FindBestNeighborSlot(Vector2Int center, HashSet<Vector2Int> occupied) {
-        Vector2Int[] neighbors = {
-            center + new Vector2Int(0, 1),
-            center + new Vector2Int(0, -1),
-            center + new Vector2Int(1, 0),
-            center + new Vector2Int(-1, 0)
-        };
-
-        foreach (var pos in neighbors) {
-            if (!occupied.Contains(pos)) return pos;
-        }
+        Vector2Int[] neighbors = { center + new Vector2Int(0, 1), center + new Vector2Int(0, -1), center + new Vector2Int(1, 0), center + new Vector2Int(-1, 0) };
+        foreach (var pos in neighbors) if (!occupied.Contains(pos)) return pos;
         return FindEmptySlot(center, occupied);
     }
 
@@ -132,20 +161,13 @@ public class GridAutoLinker : EditorWindow {
                 if (nA == nB) continue;
                 Vector3 diff = nB.transform.position - nA.transform.position;
                 if (diff.magnitude > gridStep * 1.1f) continue;
-                
-                // 自动连接上下左右 4 个方向
                 int dir = -1;
-                if (Mathf.Abs(diff.x) > Mathf.Abs(diff.z)) {
-                    dir = diff.x > 0 ? 1 : 3;
-                } else {
-                    dir = diff.z > 0 ? 0 : 2;
-                }
-                
+                if (Mathf.Abs(diff.x) > Mathf.Abs(diff.z)) dir = diff.x > 0 ? 1 : 3;
+                else dir = diff.z > 0 ? 0 : 2;
                 if (dir != -1) nA.connections[dir] = nB;
             }
             EditorUtility.SetDirty(nA);
         }
-        Debug.Log("【工具】路径自动连接完成。");
     }
 
     private void ManageSlots() {
@@ -156,42 +178,25 @@ public class GridAutoLinker : EditorWindow {
             for (int i = 0; i < 6; i++) {
                 string sName = "Slot_" + (i + 1);
                 Transform s = obj.transform.Find(sName);
-                if (!s) {
-                    s = new GameObject(sName).transform;
-                    s.SetParent(obj.transform);
-                }
+                if (!s) { s = new GameObject(sName).transform; s.SetParent(obj.transform); }
                 s.localPosition = new Vector3(((i % 3) - 1f) * slotOffset, 0.1f, ((i / 3) == 0 ? 0.3f : -0.3f));
                 node.slotPoints[i] = s;
             }
             EditorUtility.SetDirty(node);
         }
-        Debug.Log("【工具】角色站位 Slot 配置完成。");
     }
 
-    // --- 核心修复：不再操作 db.allGrids 列表 ---
     private void SyncAllToDatabase() {
-        if (db == null) {
-            Debug.LogError("【工具】未指定 GridDatabase，同步失败！");
-            return;
-        }
-
+        if (db == null) return;
         GridNode[] allNodes = GameObject.FindObjectsOfType<GridNode>();
-        
-        // 1. 给场景中的地块分配唯一 ID
         for (int i = 0; i < allNodes.Length; i++) {
             Undo.RecordObject(allNodes[i], "Assign Grid ID");
             allNodes[i].gridId = i;
             EditorUtility.SetDirty(allNodes[i]);
         }
-
-        // 2. 调用数据库的刷新方法，让它通过 FindObjectsOfType 自动建立内存映射
         db.RefreshCache();
-
-        // 3. 标记数据库已变动（虽然现在是动态缓存，但养成 SetDirty 习惯防止 SO 某些持久化字段未保存）
         EditorUtility.SetDirty(db);
         AssetDatabase.SaveAssets();
-
-        Debug.Log($"【工具】同步成功：已为 {allNodes.Length} 个地块分配 ID 并刷新数据库映射。");
     }
 }
 #endif

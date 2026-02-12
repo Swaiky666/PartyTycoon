@@ -1,13 +1,12 @@
 using UnityEngine;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine.SceneManagement;
 
 [System.Serializable]
 public class PlayerState {
     public int playerId;
     public int currentGridId;
-    public int lastGridId; // 新增：记录上一个格子的ID，用于防回退逻辑
+    public int lastGridId; 
     public int money;
     public List<string> cardNames = new List<string>();
     public int freezeTurns; 
@@ -42,8 +41,14 @@ public class GameDataManager : MonoBehaviour {
     public GameObject iceEffectPrefab;
     public GameObject smokeEffectPrefab; 
 
-    [Header("配置参数")]
-    public float dropHeight = 15f;       
+    [Header("地图固定建筑预制体")]
+    public GameObject shopPrefab;         
+    public GameObject hospitalPrefab;     
+    public GameObject bankPrefab;         
+    public GameObject prisonPrefab;       
+
+    [Header("动画配置")]
+    public float dropHeight = 15f; // 修复：补回遗漏的下落高度变量
 
     void Awake() {
         if (Instance == null) { 
@@ -57,36 +62,28 @@ public class GameDataManager : MonoBehaviour {
     public void SwitchToRandomMinigame(List<PlayerController> players) {
         SaveGameState(players);
         if (minigameScenes.Count > 0) {
-            int randomIndex = Random.Range(0, minigameScenes.Count);
-            string targetScene = minigameScenes[randomIndex];
+            string targetScene = minigameScenes[Random.Range(0, minigameScenes.Count)];
             SceneManager.LoadScene(targetScene);
-        } else {
-            Debug.LogError("【系统】请在 GameDataManager 的 Inspector 中配置小游戏场景名！");
         }
     }
 
     public void SaveGameState(List<PlayerController> players) {
         savedPlayers.Clear();
         foreach (var p in players) {
-            PlayerState state = new PlayerState();
-            state.playerId = p.playerId;
-            state.currentGridId = (p.currentGrid != null) ? p.currentGrid.gridId : -1;
-            // 记录 lastGrid 的 ID
-            state.lastGridId = (p.GetLastGrid() != null) ? p.GetLastGrid().gridId : -1;
-            state.money = p.money;
-            state.freezeTurns = p.remainingFreezeTurns;
-            state.rotation = p.transform.rotation;
-            state.cardNames = new List<string>();
-            foreach (var card in p.cards) {
-                if (card != null) state.cardNames.Add(card.cardName);
-            }
+            PlayerState state = new PlayerState {
+                playerId = p.playerId,
+                currentGridId = (p.currentGrid != null) ? p.currentGrid.gridId : -1,
+                lastGridId = (p.GetLastGrid() != null) ? p.GetLastGrid().gridId : -1,
+                money = p.money,
+                freezeTurns = p.remainingFreezeTurns,
+                rotation = p.transform.rotation
+            };
+            foreach (var card in p.cards) if (card != null) state.cardNames.Add(card.cardName);
             savedPlayers.Add(state);
         }
 
         savedGrids.Clear();
-        foreach (var node in database.GetAllNodes()) {
-            savedGrids.Add(node.GetCurrentState());
-        }
+        foreach (var node in database.GetAllNodes()) savedGrids.Add(node.GetCurrentState());
     }
 
     public void LoadGameState(List<PlayerController> players) {
@@ -94,9 +91,7 @@ public class GameDataManager : MonoBehaviour {
 
         foreach (var gState in savedGrids) {
             GridNode node = database.GetGridById(gState.gridId);
-            if (node != null) {
-                node.ApplyState(gState, players, housePrefab, barricadePrefab);
-            }
+            if (node != null) node.ApplyState(gState, players, housePrefab, barricadePrefab);
         }
 
         foreach (var state in savedPlayers) {
@@ -105,31 +100,18 @@ public class GameDataManager : MonoBehaviour {
                 p.money = state.money;
                 p.remainingFreezeTurns = state.freezeTurns;
                 p.transform.rotation = state.rotation;
-
                 p.cards.Clear();
                 foreach (string cName in state.cardNames) {
                     CardBase refCard = allPossibleCards.Find(c => c.cardName == cName);
                     if (refCard != null) p.cards.Add(Instantiate(refCard));
                 }
-
-                // 恢复当前格子
                 GridNode currNode = database.GetGridById(state.currentGridId);
                 if (currNode != null) {
                     p.currentGrid = currNode;
                     p.SetInitialPosition(currNode);
                 }
-
-                // 核心修复：恢复上一个格子，确保防回退逻辑生效
-                if (state.lastGridId != -1) {
-                    GridNode lastNode = database.GetGridById(state.lastGridId);
-                    p.SetLastGrid(lastNode);
-                } else {
-                    p.SetLastGrid(null);
-                }
-
-                if (state.freezeTurns > 0 && iceEffectPrefab != null) {
-                    p.ApplyFreeze(state.freezeTurns, iceEffectPrefab);
-                }
+                if (state.lastGridId != -1) p.SetLastGrid(database.GetGridById(state.lastGridId));
+                if (state.freezeTurns > 0 && iceEffectPrefab != null) p.ApplyFreeze(state.freezeTurns, iceEffectPrefab);
             }
         }
         ClearCache();
