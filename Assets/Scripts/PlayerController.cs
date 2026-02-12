@@ -6,7 +6,10 @@ public class PlayerController : MonoBehaviour {
     public int playerId;
     public float moveSpeed = 5f;
     public float rotationSpeed = 10f;
+    
+    [Tooltip("角色相对于地块插槽的高度偏移，支持负数以允许角色下沉。")]
     public float heightOffset = 0.5f; 
+    
     public GameObject arrowPrefab; 
     public int money = 5000;
     public List<CardBase> startingCards = new List<CardBase>();
@@ -23,6 +26,7 @@ public class PlayerController : MonoBehaviour {
         foreach (var c in startingCards) if (c != null) cards.Add(Instantiate(c));
     }
 
+    // --- 冰冻逻辑 ---
     public void ApplyFreeze(int turns, GameObject prefab) {
         remainingFreezeTurns = turns;
         if (currentIceVisual == null && prefab != null) {
@@ -53,14 +57,15 @@ public class PlayerController : MonoBehaviour {
         foreach (var r in rs) if (r != null) r.material.color = color;
     }
 
+    // --- 核心修复：现在支持负 Offset ---
     public void SetInitialPosition(GridNode node) {
         if (node == null) return;
         currentGrid = node;
         StopAllCoroutines();
 
-        float finalOffset = (heightOffset <= 0) ? 0.5f : heightOffset;
+        // 移除了之前的 (heightOffset <= 0) 保底判断，现在直接使用你填入的值
         Vector3 slotPos = node.GetSlotPosition(this.gameObject);
-        Vector3 finalPos = new Vector3(slotPos.x, slotPos.y + finalOffset, slotPos.z);
+        Vector3 finalPos = new Vector3(slotPos.x, slotPos.y + heightOffset, slotPos.z);
         
         transform.position = finalPos;
         
@@ -73,7 +78,7 @@ public class PlayerController : MonoBehaviour {
         }
 
         Physics.SyncTransforms();
-        Debug.Log($"【系统】玩家 {playerId} 已定位至地块 {node.gridId}");
+        Debug.Log($"【系统】玩家 {playerId} 已定位至地块 {node.gridId} (当前 Offset: {heightOffset})");
     }
 
     private IEnumerator RestorePhysics(Rigidbody rb) {
@@ -81,6 +86,7 @@ public class PlayerController : MonoBehaviour {
         if (rb != null) rb.isKinematic = false;
     }
 
+    // --- 移动逻辑 ---
     public void StartMoving(int steps, System.Action onComplete) {
         StartCoroutine(MoveRoutine(steps, onComplete));
     }
@@ -150,9 +156,9 @@ public class PlayerController : MonoBehaviour {
     }
 
     private IEnumerator MoveToNode(GridNode targetNode) {
-        float safeOffset = (heightOffset <= 0) ? 0.5f : heightOffset;
+        // 同样应用原始的 heightOffset，支持负值
         Vector3 targetPos = targetNode.GetSlotPosition(this.gameObject);
-        targetPos.y += safeOffset;
+        targetPos.y += heightOffset;
 
         while (Vector3.Distance(transform.position, targetPos) > 0.01f) {
             transform.position = Vector3.MoveTowards(transform.position, targetPos, moveSpeed * Time.deltaTime);

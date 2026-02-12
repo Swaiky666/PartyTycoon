@@ -92,7 +92,7 @@ MonoBehaviour:
   playerId: 0
   moveSpeed: 5
   rotationSpeed: 10
-  heightOffset: 0
+  heightOffset: -0.025
   arrowPrefab: {fileID: 5427742095911369991, guid: 9002fc4049e814d89bf56ff011d729d0, type: 3}
   money: 5000
   startingCards:
