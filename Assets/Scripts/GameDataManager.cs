@@ -3,14 +3,15 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine.SceneManagement;
 
-// --- 必须保留这些类定义，否则会报 CS0246 错误 ---
 [System.Serializable]
 public class PlayerState {
     public int playerId;
     public int currentGridId;
+    public int lastGridId; // 新增：记录上一个格子的ID，用于防回退逻辑
     public int money;
     public List<string> cardNames = new List<string>();
     public int freezeTurns; 
+    public Quaternion rotation; 
 }
 
 [System.Serializable]
@@ -31,6 +32,9 @@ public class GameDataManager : MonoBehaviour {
     public List<PlayerState> savedPlayers = new List<PlayerState>();
     public List<GridState> savedGrids = new List<GridState>();
 
+    [Header("小游戏池配置")]
+    public List<string> minigameScenes = new List<string>(); 
+
     [Header("通用资源预制体")]
     public List<CardBase> allPossibleCards = new List<CardBase>();
     public GameObject barricadePrefab;
@@ -38,12 +42,6 @@ public class GameDataManager : MonoBehaviour {
     public GameObject iceEffectPrefab;
     public GameObject smokeEffectPrefab; 
 
-    [Header("地图固定建筑预制体")]
-    public GameObject shopPrefab;         
-    public GameObject hospitalPrefab;     
-    public GameObject bankPrefab;         
-    public GameObject prisonPrefab;       
-    
     [Header("配置参数")]
     public float dropHeight = 15f;       
 
@@ -51,64 +49,48 @@ public class GameDataManager : MonoBehaviour {
         if (Instance == null) { 
             Instance = this; 
             DontDestroyOnLoad(gameObject); 
-        } else {
-            Destroy(gameObject);
+        } else { 
+            Destroy(gameObject); 
         }
     }
 
-    public GameObject GetFixedBuildingPrefab(GridType type) {
-        switch (type) {
-            case GridType.Shop: return shopPrefab;
-            case GridType.Hospital: return hospitalPrefab;
-            case GridType.Bank: return bankPrefab;
-            case GridType.Prison: return prisonPrefab;
-            default: return null;
-        }
-    }
-
-    public void SwitchToMinigame(string sceneName, List<PlayerController> players) {
+    public void SwitchToRandomMinigame(List<PlayerController> players) {
         SaveGameState(players);
-        SceneManager.LoadScene(sceneName);
+        if (minigameScenes.Count > 0) {
+            int randomIndex = Random.Range(0, minigameScenes.Count);
+            string targetScene = minigameScenes[randomIndex];
+            SceneManager.LoadScene(targetScene);
+        } else {
+            Debug.LogError("【系统】请在 GameDataManager 的 Inspector 中配置小游戏场景名！");
+        }
     }
 
     public void SaveGameState(List<PlayerController> players) {
-        if (database != null) database.RefreshCache();
-
         savedPlayers.Clear();
-        savedGrids.Clear();
-
-        if (players == null || players.Count == 0) {
-            Debug.LogError("【系统】保存失败：玩家列表为空！");
-            return;
-        }
-
         foreach (var p in players) {
-            PlayerState s = new PlayerState {
-                playerId = p.playerId,
-                money = p.money,
-                freezeTurns = p.remainingFreezeTurns,
-                currentGridId = p.currentGrid != null ? p.currentGrid.gridId : -1,
-                cardNames = p.cards.Select(c => c.cardName).ToList()
-            };
-            savedPlayers.Add(s);
+            PlayerState state = new PlayerState();
+            state.playerId = p.playerId;
+            state.currentGridId = (p.currentGrid != null) ? p.currentGrid.gridId : -1;
+            // 记录 lastGrid 的 ID
+            state.lastGridId = (p.GetLastGrid() != null) ? p.GetLastGrid().gridId : -1;
+            state.money = p.money;
+            state.freezeTurns = p.remainingFreezeTurns;
+            state.rotation = p.transform.rotation;
+            state.cardNames = new List<string>();
+            foreach (var card in p.cards) {
+                if (card != null) state.cardNames.Add(card.cardName);
+            }
+            savedPlayers.Add(state);
         }
 
-        GridNode[] allSceneNodes = GameObject.FindObjectsOfType<GridNode>();
-        foreach (var node in allSceneNodes) {
-            if (node.gridId != -1) {
-                savedGrids.Add(node.GetCurrentState());
-            }
+        savedGrids.Clear();
+        foreach (var node in database.GetAllNodes()) {
+            savedGrids.Add(node.GetCurrentState());
         }
-        Debug.Log($"【系统】数据存入缓存完成：玩家 {savedPlayers.Count}，地块 {savedGrids.Count}。");
     }
 
     public void LoadGameState(List<PlayerController> players) {
-        if (database != null) database.RefreshCache();
-
-        if (savedPlayers.Count == 0 || database == null) {
-            Debug.LogWarning("【系统】没有找到存档数据。");
-            return;
-        }
+        if (savedPlayers.Count == 0 || database == null) return;
 
         foreach (var gState in savedGrids) {
             GridNode node = database.GetGridById(gState.gridId);
@@ -122,17 +104,27 @@ public class GameDataManager : MonoBehaviour {
             if (p != null) {
                 p.money = state.money;
                 p.remainingFreezeTurns = state.freezeTurns;
-                
+                p.transform.rotation = state.rotation;
+
                 p.cards.Clear();
                 foreach (string cName in state.cardNames) {
                     CardBase refCard = allPossibleCards.Find(c => c.cardName == cName);
                     if (refCard != null) p.cards.Add(Instantiate(refCard));
                 }
 
-                GridNode node = database.GetGridById(state.currentGridId);
-                if (node != null) {
-                    p.currentGrid = node;
-                    p.SetInitialPosition(node);
+                // 恢复当前格子
+                GridNode currNode = database.GetGridById(state.currentGridId);
+                if (currNode != null) {
+                    p.currentGrid = currNode;
+                    p.SetInitialPosition(currNode);
+                }
+
+                // 核心修复：恢复上一个格子，确保防回退逻辑生效
+                if (state.lastGridId != -1) {
+                    GridNode lastNode = database.GetGridById(state.lastGridId);
+                    p.SetLastGrid(lastNode);
+                } else {
+                    p.SetLastGrid(null);
                 }
 
                 if (state.freezeTurns > 0 && iceEffectPrefab != null) {
@@ -140,8 +132,6 @@ public class GameDataManager : MonoBehaviour {
                 }
             }
         }
-
-        Debug.Log("【系统】数据恢复成功！");
         ClearCache();
     }
 

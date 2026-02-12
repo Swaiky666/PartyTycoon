@@ -231,6 +231,8 @@ MonoBehaviour:
   database: {fileID: 11400000, guid: 092ab140f149d4dd5819dbc2c67c4cf3, type: 2}
   savedPlayers: []
   savedGrids: []
+  minigameScenes:
+  - MinigameScene
   allPossibleCards:
   - {fileID: 11400000, guid: 228f94ba9c8cf4f348fbd92cd5aa3d57, type: 2}
   - {fileID: 11400000, guid: fa9dc0e8294af4955bd9f7b2db57742d, type: 2}
@@ -238,10 +240,6 @@ MonoBehaviour:
   housePrefab: {fileID: 1319817351213823019, guid: 399cdef97dd5449baa1d93490c2042f3, type: 3}
   iceEffectPrefab: {fileID: 1417109416525264207, guid: 6cb037c5634ee4110bc07fc9015edd66, type: 3}
   smokeEffectPrefab: {fileID: 4360349100514087828, guid: 5af978f9b85b89f4b8c026caf85fe44b, type: 3}
-  shopPrefab: {fileID: 1319817351213823019, guid: 399cdef97dd5449baa1d93490c2042f3, type: 3}
-  hospitalPrefab: {fileID: 1319817351213823019, guid: 399cdef97dd5449baa1d93490c2042f3, type: 3}
-  bankPrefab: {fileID: 1319817351213823019, guid: 399cdef97dd5449baa1d93490c2042f3, type: 3}
-  prisonPrefab: {fileID: 1319817351213823019, guid: 399cdef97dd5449baa1d93490c2042f3, type: 3}
   dropHeight: 15
 --- !u!1 &96457048
 GameObject:
@@ -3562,6 +3560,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: da1b2e0ec32ad406e83cd5314f5271d2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  outlineColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  outlineWidth: 7
+  outlineMode: 0
 --- !u!1 &1237929511
 GameObject:
   m_ObjectHideFlags: 0

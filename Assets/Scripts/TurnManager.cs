@@ -1,6 +1,7 @@
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 
 public class TurnManager : MonoBehaviour {
     public static TurnManager Instance;
@@ -26,11 +27,24 @@ public class TurnManager : MonoBehaviour {
         return turnOrder[currentIndex];
     }
 
+    // 正常开局排序逻辑
     public void BeginGame(List<PlayerController> sortedPlayers) {
         turnOrder = sortedPlayers;
         currentIndex = 0;
         isGameActive = true;
         UIManager.Instance.SetPlayerStatsVisible(true);
+        StartTurn();
+    }
+
+    // 从小游戏返回后的初始化逻辑：重新随机化行动顺序
+    public void BeginGameFromMinigame(List<PlayerController> players) {
+        // 使用随机值对玩家列表重新洗牌
+        turnOrder = players.OrderBy(x => Random.value).ToList();
+        currentIndex = 0;
+        isGameActive = true;
+        UIManager.Instance.SetPlayerStatsVisible(true);
+        
+        Debug.Log("【系统】从小游戏归来，本轮新顺序：" + string.Join(",", turnOrder.Select(p => p.playerId)));
         StartTurn();
     }
 
@@ -88,15 +102,6 @@ public class TurnManager : MonoBehaviour {
         }
     }
 
-    public void EnterCardTargetingMode() {
-        isInCardMode = true;
-        if (diceAnimator != null) diceAnimator.ShowDice(false);
-        if (CameraController.Instance != null) CameraController.Instance.SetFreeMode(true);
-        UIManager.Instance.viewButton.gameObject.SetActive(false);
-        UIManager.Instance.actionButton.gameObject.SetActive(false);
-        UIManager.Instance.UpdateStatus("点击红色地块使用道具（可拖拽屏幕平移视角）");
-    }
-
     void ToggleFreeView() {
         if (isInCardMode) return; 
         isInFreeView = !isInFreeView;
@@ -107,14 +112,8 @@ public class TurnManager : MonoBehaviour {
         UIManager.Instance.actionButton.gameObject.SetActive(!isInFreeView);
     }
 
-    public void CompleteCardAction() {
-        StartTurn(); 
-    }
-
     void StartDiceRoll() {
         if (isInFreeView) ToggleFreeView();
-        PlayerController p = GetCurrentPlayer();
-        if (diceAnimator != null) diceAnimator.ShowDice(true);
         UIManager.Instance.SetExtraButtonsVisible(false);
         UIManager.Instance.HideActionButton();
         StartCoroutine(ProcessTurnSequence());
@@ -130,18 +129,15 @@ public class TurnManager : MonoBehaviour {
             yield break; 
         }
 
-        // 1. 计算点数，但不立即公布
         int steps = Random.Range(1, 7);
         UIManager.Instance.UpdateStatus("骰子旋转中..."); 
 
-        // 2. 等待骰子旋转动画及缩放反馈结束
         if (diceAnimator != null) {
             yield return StartCoroutine(diceAnimator.PlayRollSequence(steps, null));
         }
 
-        // 3. 动画结束后公布结果
         UIManager.Instance.UpdateStatus($"玩家 {p.playerId} 投出了 {steps} 点！");
-        yield return new WaitForSeconds(0.5f); // 停留一下让玩家看清文字
+        yield return new WaitForSeconds(0.5f);
 
         bool moveDone = false;
         p.StartMoving(steps, () => moveDone = true);
@@ -159,7 +155,33 @@ public class TurnManager : MonoBehaviour {
 
     void EndTurn() {
         if (diceAnimator != null) diceAnimator.ShowDice(false);
-        currentIndex = (currentIndex + 1) % turnOrder.Count;
-        StartTurn();
+
+        // 检测是否所有人都走完了
+        if (currentIndex >= turnOrder.Count - 1) {
+            Debug.Log("【流程】本轮结束，准备进入小游戏...");
+            StartCoroutine(EnterMinigameFlow());
+        } else {
+            currentIndex++;
+            StartTurn();
+        }
+    }
+
+    IEnumerator EnterMinigameFlow() {
+        UIManager.Instance.UpdateStatus("本轮结束！准备进入小游戏环节...");
+        yield return new WaitForSeconds(2.0f);
+        // 保存并跳转
+        GameDataManager.Instance.SwitchToRandomMinigame(allPlayers);
+    }
+
+    public void CompleteCardAction() {
+        StartTurn(); 
+    }
+
+    public void EnterCardTargetingMode() {
+        isInCardMode = true;
+        if (diceAnimator != null) diceAnimator.ShowDice(false);
+        if (CameraController.Instance != null) CameraController.Instance.SetFreeMode(true);
+        UIManager.Instance.viewButton.gameObject.SetActive(false);
+        UIManager.Instance.actionButton.gameObject.SetActive(false);
     }
 }

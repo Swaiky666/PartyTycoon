@@ -31,9 +31,9 @@ public class UIManager : MonoBehaviour {
     }
 
     private void OnTestSwitchClicked() {
-        // 修复：确保 TurnManager 中定义了 allPlayers 变量
+        // 修复：更新方法名为 SwitchToRandomMinigame
         if (TurnManager.Instance != null && TurnManager.Instance.allPlayers != null) {
-            GameDataManager.Instance.SwitchToMinigame("MinigameScene", TurnManager.Instance.allPlayers);
+            GameDataManager.Instance.SwitchToRandomMinigame(TurnManager.Instance.allPlayers);
         } else {
             Debug.LogError("UIManager: 无法找到玩家列表，请检查 TurnManager.allPlayers 是否公开。");
         }
@@ -44,7 +44,7 @@ public class UIManager : MonoBehaviour {
     }
 
     public void UpdatePlayerStats(PlayerController p) {
-        if (playerStatsText != null) {
+        if (playerStatsText != null && p != null) {
             playerStatsText.text = $"玩家 {p.playerId} | 金币: <color=yellow>${p.money}</color>";
         }
     }
@@ -71,7 +71,6 @@ public class UIManager : MonoBehaviour {
         if(testSwitchSceneButton) testSwitchSceneButton.gameObject.SetActive(visible);
     }
 
-    // 修复：补全 TurnManager 引用的缺失方法
     public void SetViewButtonLabel(string label) {
         if(viewButton != null) {
             var txt = viewButton.GetComponentInChildren<TextMeshProUGUI>();
