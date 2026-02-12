@@ -4,6 +4,11 @@ using System.Collections.Generic;
 public class CardRangeFinder : MonoBehaviour {
     public static CardRangeFinder Instance;
     
+    [Header("描边表现设置")]
+    public Color outlineColor = Color.yellow;
+    public float outlineWidth = 7f;
+    public Outline.Mode outlineMode = Outline.Mode.OutlineAll;
+
     private List<GridNode> highlightedNodes = new List<GridNode>();
     private CardBase currentCard;
 
@@ -11,26 +16,46 @@ public class CardRangeFinder : MonoBehaviour {
 
     public void ShowRange(CardBase card) {
         currentCard = card;
-        ClearHighlight();
+        ClearHighlight(); // 先清理，确保状态干净
         
         PlayerController p = TurnManager.Instance.GetCurrentPlayer();
-        // 获取符合条件的格子
+        // 计算 BFS 范围
         highlightedNodes = CalculateRange(p.currentGrid, card.rangeStraight, card.rangeAdjacent);
         
-        // 标红显示
+        Debug.Log($"【卡牌系统】正在为 {highlightedNodes.Count} 个地块激活交互能力...");
+
         foreach (var node in highlightedNodes) {
-            node.GetComponent<Renderer>().material.color = Color.red;
-            // 为格子增加点击确认逻辑（暂时简化，可复用 ArrowClicker 思想）
-            node.gameObject.AddComponent<GridClicker>().Setup(node, ConfirmUse);
+            // 1. 动态添加 BoxCollider (如果原本没有)
+            // 必须有 Collider，OnMouseDown 才能生效
+            BoxCollider col = node.gameObject.GetComponent<BoxCollider>();
+            if (col == null) {
+                col = node.gameObject.AddComponent<BoxCollider>();
+                // 这里的 Size 可以根据你的地块模型大小微调，通常 1,1,1 或匹配模型
+                col.size = new Vector3(2f, 0.5f, 2f); 
+                col.isTrigger = true; // 设为 Trigger 防止产生物理碰撞力
+            }
+
+            // 2. 动态添加 QuickOutline 描边
+            Outline outline = node.gameObject.GetComponent<Outline>();
+            if (outline == null) {
+                outline = node.gameObject.AddComponent<Outline>();
+            }
+            outline.OutlineColor = outlineColor;
+            outline.OutlineWidth = outlineWidth;
+            outline.OutlineMode = outlineMode;
+            outline.enabled = true;
+
+            // 3. 动态添加 GridClicker 点击检测
+            GridClicker clicker = node.gameObject.GetComponent<GridClicker>();
+            if (clicker == null) {
+                clicker = node.gameObject.AddComponent<GridClicker>();
+            }
+            clicker.Setup(node, ConfirmUse);
         }
-        
-        UIManager.Instance.UpdateStatus("点击红色地块使用道具");
     }
 
     private List<GridNode> CalculateRange(GridNode center, int straightLimit, int adjacentLimit) {
         List<GridNode> results = new List<GridNode>();
-        
-        // BFS 算法寻找“相邻路径”范围
         Queue<(GridNode node, int dist)> queue = new Queue<(GridNode, int)>();
         queue.Enqueue((center, 0));
         HashSet<GridNode> visited = new HashSet<GridNode>();
@@ -38,7 +63,7 @@ public class CardRangeFinder : MonoBehaviour {
 
         while (queue.Count > 0) {
             var current = queue.Dequeue();
-            if (current.dist > 0) results.Add(current.node); // 不包含自己站的格子
+            if (current.dist > 0) results.Add(current.node); 
 
             if (current.dist < adjacentLimit) {
                 foreach (var next in current.node.connections) {
@@ -49,26 +74,39 @@ public class CardRangeFinder : MonoBehaviour {
                 }
             }
         }
-        
-        // 直线逻辑已经在 BFS 中涵盖（因为直线也是相邻的一种），
-        // 如果你的直线范围大于相邻范围，则需要在此处额外写四个方向的循环扩展。
-        
         return results;
     }
 
     void ConfirmUse(GridNode target) {
-        if (currentCard.UseCard(TurnManager.Instance.GetCurrentPlayer(), target)) {
-            ClearHighlight();
+        Debug.Log($"【卡牌系统】点击确认！目标地块: {target.gridId}");
+        PlayerController currentPlayer = TurnManager.Instance.GetCurrentPlayer();
+
+        if (currentCard.UseCard(currentPlayer, target)) {
+            currentPlayer.cards.Remove(currentCard);
+            ClearHighlight(); // 使用成功，卸载所有组件
             TurnManager.Instance.CompleteCardAction();
         }
     }
 
     public void ClearHighlight() {
+        Debug.Log("【卡牌系统】清理地块交互组件...");
         foreach (var node in highlightedNodes) {
             if (node == null) continue;
-            // 还原颜色（此处应根据地块原本逻辑还原，暂时设为白色）
-            node.GetComponent<Renderer>().material.color = Color.white;
-            Destroy(node.GetComponent<GridClicker>());
+
+            // 1. 移除描边
+            Outline outline = node.gameObject.GetComponent<Outline>();
+            if (outline != null) Destroy(outline);
+
+            // 2. 移除点击器
+            GridClicker clicker = node.gameObject.GetComponent<GridClicker>();
+            if (clicker != null) Destroy(clicker);
+
+            // 3. 移除碰撞体 (核心修复)
+            // 这样平时地块就不具备射线检测能力，性能最好且不会误触
+            BoxCollider col = node.gameObject.GetComponent<BoxCollider>();
+            if (col != null) {
+                Destroy(col);
+            }
         }
         highlightedNodes.Clear();
     }

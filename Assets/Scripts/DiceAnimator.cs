@@ -1,11 +1,16 @@
 using UnityEngine;
 using System.Collections;
+using DG.Tweening; // 确保引用了 DOTween
 
 public class DiceAnimator : MonoBehaviour {
     [Header("速度配置")]
     public float idleSpinSpeed = 150f;   
     public float rollSpinSpeed = 600f;   
-    public float transitionTime = 1.5f; // 增加时长，让偏移过程更自然
+    public float transitionTime = 1.5f; 
+
+    [Header("打磨配置")]
+    public float punchScaleAmount = 1.2f; // 停止时放大的倍率（基于原始大小的比例）
+    public float punchDuration = 0.3f;    // 缩放动画的时长
 
     [Header("6个点的角度(1-6)")]
     public Vector3[] faceRotations = new Vector3[6];
@@ -15,14 +20,23 @@ public class DiceAnimator : MonoBehaviour {
 
     private bool isIdle = false;
     private bool isRolling = false;
-    private bool isLocking = false; // 新增：正在锁定状态
+    private bool isLocking = false; 
     private float currentSpeed = 0f;
     private Quaternion targetQuaternion;
+    
+    // 用于记录你在 Inspector 中设置的原始大小
+    private Vector3 originalScale;
 
     void Awake() {
         if (diceModel == null && transform.childCount > 0) {
             diceModel = transform.GetChild(0).gameObject;
         }
+        
+        // 核心修改：在最开始就记住你的缩放设置
+        if (diceModel != null) {
+            originalScale = diceModel.transform.localScale;
+        }
+        
         ShowDice(false);
     }
 
@@ -32,8 +46,6 @@ public class DiceAnimator : MonoBehaviour {
         if (isIdle || isRolling) {
             float targetSpeed = isRolling ? rollSpinSpeed : (isIdle ? idleSpinSpeed : 0f);
             currentSpeed = Mathf.Lerp(currentSpeed, targetSpeed, Time.deltaTime * 3f);
-            
-            // 持续自由旋转
             diceModel.transform.Rotate(new Vector3(1f, 0.7f, 0.3f) * currentSpeed * Time.deltaTime);
         }
     }
@@ -46,7 +58,11 @@ public class DiceAnimator : MonoBehaviour {
     }
 
     public void ShowDice(bool show) {
-        if (diceModel != null) diceModel.SetActive(show);
+        if (diceModel != null) {
+            diceModel.SetActive(show);
+            // 确保显示/隐藏时恢复到你在 Inspector 设置的大小，不被动画残留干扰
+            diceModel.transform.localScale = originalScale;
+        }
         isIdle = show;
         if (!show) {
             isRolling = false;
@@ -56,43 +72,42 @@ public class DiceAnimator : MonoBehaviour {
     }
 
     public IEnumerator PlayRollSequence(int result, System.Action onFinished, bool autoHide = true) {
-        // 1. 进入快转阶段
         isRolling = true;
         isIdle = false;
         isLocking = false;
         
-        yield return new WaitForSeconds(0.8f); // 保持快转的时间
+        yield return new WaitForSeconds(0.8f); 
 
-        // 2. 慢慢偏移锁定阶段
         isRolling = false; 
         isLocking = true;
-        
         targetQuaternion = Quaternion.Euler(faceRotations[result - 1]);
         
         float elapsed = 0f;
         while (elapsed < transitionTime) {
             elapsed += Time.deltaTime;
             float t = elapsed / transitionTime;
-            
-            // 平滑曲线：前快后慢 (Cubic Out)
             float easeT = 1f - Mathf.Pow(1f - t, 3f);
 
-            // 同时做两件事：
-            // A. 让当前持续旋转的速度降为 0
             currentSpeed = Mathf.Lerp(currentSpeed, 0, easeT);
             diceModel.transform.Rotate(new Vector3(1f, 0.7f, 0.3f) * currentSpeed * Time.deltaTime);
-
-            // B. 在旋转的同时，将旋转方向平滑拉向目标方向
-            // 使用 Slerp 进行姿态引导
             diceModel.transform.localRotation = Quaternion.Slerp(diceModel.transform.localRotation, targetQuaternion, easeT * 0.1f);
-            
             yield return null;
         }
 
-        // 3. 最后强行校准，确保绝对精准
+        // 锁定结果
         diceModel.transform.localRotation = targetQuaternion;
         isLocking = false;
 
+        // --- 核心打磨：使用原始大小进行 Punch 动画 ---
+        // Vector3.Scale(originalScale, Vector3.one * (punchScaleAmount - 1f)) 确保增加的比例是基于原大小的
+        Vector3 punchAmount = new Vector3(
+            originalScale.x * (punchScaleAmount - 1f),
+            originalScale.y * (punchScaleAmount - 1f),
+            originalScale.z * (punchScaleAmount - 1f)
+        );
+        diceModel.transform.DOPunchScale(punchAmount, punchDuration, 10, 1f);
+
+        // 等待 1 秒让玩家看清结果，同时也等待缩放动画播完
         yield return new WaitForSeconds(1.0f); 
         
         if (autoHide) ShowDice(false);

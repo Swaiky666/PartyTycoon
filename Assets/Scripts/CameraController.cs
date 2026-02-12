@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
+using DG.Tweening; // 必须引用
 
 public class CameraController : MonoBehaviour {
     public static CameraController Instance;
@@ -28,9 +29,11 @@ public class CameraController : MonoBehaviour {
     private Vector3 freePivotOffset; 
     private Vector2 lastInputPos;
 
+    // --- 新增震动相关变量 ---
+    private Vector3 shakeOffset = Vector3.zero;
+
     void Awake() { Instance = this; }
 
-    // 必须保留，供 TurnManager 调用
     public void SetTarget(Transform newTarget) { target = newTarget; }
 
     void LateUpdate() {
@@ -56,6 +59,17 @@ public class CameraController : MonoBehaviour {
         UpdatePosition();
     }
 
+    // --- 供外部调用的震动接口 ---
+    public void ApplyShake(float duration = 0.4f, float strength = 0.5f) {
+        // 先停止之前的震动，防止叠加导致的坐标偏移无法归零
+        DOTween.Kill("CameraShake");
+        
+        // 核心逻辑：震动的是变量偏移，而不是 Transform 坐标本身
+        DOTween.Shake(() => shakeOffset, x => shakeOffset = x, duration, strength, 20, 90)
+            .SetId("CameraShake")
+            .OnComplete(() => shakeOffset = Vector3.zero);
+    }
+
     public void SetFreeMode(bool free) {
         isFreeMode = free;
         if (free) {
@@ -77,7 +91,6 @@ public class CameraController : MonoBehaviour {
         Vector3 forward = transform.up; forward.y = 0;
         Vector3 right = transform.right; right.y = 0;
 
-        // 手机端/左键“推屏”感
         Vector3 moveDir = (right.normalized * -delta.x + forward.normalized * -delta.y);
         freePivotOffset += moveDir * panSensitivity * (currentDistance / 10f);
         freePivotOffset = Vector3.ClampMagnitude(freePivotOffset, panRange);
@@ -96,7 +109,11 @@ public class CameraController : MonoBehaviour {
         Vector3 targetPoint = target.position + freePivotOffset;
         smoothPivotPoint = Vector3.SmoothDamp(smoothPivotPoint, targetPoint, ref currentVelocity, followSmoothTime);
         Quaternion rotation = Quaternion.Euler(pitch, yaw, 0);
-        transform.position = smoothPivotPoint + rotation * new Vector3(0, 0, -currentDistance);
+        
+        // 核心修改：在最终坐标上叠加上震动偏移量
+        Vector3 basePosition = smoothPivotPoint + rotation * new Vector3(0, 0, -currentDistance);
+        transform.position = basePosition + shakeOffset; 
+        
         transform.LookAt(smoothPivotPoint + (isFreeMode ? Vector3.zero : Vector3.up * 1.5f));
     }
 

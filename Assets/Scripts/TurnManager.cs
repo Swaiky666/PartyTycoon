@@ -8,15 +8,13 @@ public class TurnManager : MonoBehaviour {
     [Header("引用")]
     public DiceAnimator diceAnimator; 
     
-    // --- 仅在此处新增一个属性，用于场景切换时获取玩家数据，不改变原有逻辑 ---
     public List<PlayerController> allPlayers => turnOrder;
 
     private List<PlayerController> turnOrder;
     private int currentIndex = 0;
     private bool isGameActive = false;
-
-    private bool isInFreeView = false;  // 主动点击“自由俯视”按钮的状态
-    private bool isInCardMode = false;  // 正在打开卡牌列表或正在选择释放目标
+    private bool isInFreeView = false;  
+    private bool isInCardMode = false;  
     private string originalStatusText = ""; 
 
     void Awake() { 
@@ -42,7 +40,6 @@ public class TurnManager : MonoBehaviour {
         PlayerController p = GetCurrentPlayer();
         if (p == null) return;
 
-        // 状态重置：恢复相机跟随玩家模式
         if (CameraController.Instance != null) {
             CameraController.Instance.enabled = true;
             CameraController.Instance.SetTarget(p.transform);
@@ -58,12 +55,10 @@ public class TurnManager : MonoBehaviour {
         originalStatusText = $"当前回合：玩家 {p.playerId}";
         UIManager.Instance.UpdateStatus(originalStatusText);
         
-        // 显示并旋转骰子
         if (diceAnimator != null) diceAnimator.ShowAndIdle();
         
         UIManager.Instance.ShowActionButton("投掷骰子", () => StartDiceRoll());
 
-        // 刷新 UI 按钮初始显隐
         UIManager.Instance.SetExtraButtonsVisible(true);
         UIManager.Instance.viewButton.gameObject.SetActive(true);
         UIManager.Instance.cardButton.gameObject.SetActive(true);
@@ -77,72 +72,49 @@ public class TurnManager : MonoBehaviour {
         UIManager.Instance.cardButton.onClick.AddListener(ToggleCardMode);
     }
 
-    // 道具卡按钮逻辑
     void ToggleCardMode() {
         if (isInFreeView) return; 
-        
         isInCardMode = !isInCardMode;
-
         if (isInCardMode) {
             if (diceAnimator != null) diceAnimator.ShowDice(false);
             UIManager.Instance.HideActionButton(); 
             UIManager.Instance.SetCardButtonLabel("返回"); 
-            
-            // 打开列表
             CardUIController.Instance.Show(GetCurrentPlayer().cards);
             UIManager.Instance.UpdateStatus("请选择要使用的道具卡");
         } else {
-            // “返回”逻辑：清理并刷新回合 UI
             CardUIController.Instance.HideUI();
             if (CardRangeFinder.Instance != null) CardRangeFinder.Instance.ClearHighlight();
             StartTurn(); 
         }
     }
 
-    // 关键：点击具体卡牌后，由 CardUIController 调用此方法
     public void EnterCardTargetingMode() {
         isInCardMode = true;
-        // 1. 隐藏骰子
         if (diceAnimator != null) diceAnimator.ShowDice(false);
-        // 2. 相机强制进入 90度 垂直俯视并开启平移模式
         if (CameraController.Instance != null) CameraController.Instance.SetFreeMode(true);
-        // 3. 隐藏不相关的 UI，只留“取消”按钮（取消按钮由 CardUIController 控制显示）
         UIManager.Instance.viewButton.gameObject.SetActive(false);
         UIManager.Instance.actionButton.gameObject.SetActive(false);
         UIManager.Instance.UpdateStatus("点击红色地块使用道具（可拖拽屏幕平移视角）");
     }
 
-    // 自由俯视按钮逻辑（纯观察模式）
     void ToggleFreeView() {
         if (isInCardMode) return; 
-
         isInFreeView = !isInFreeView;
-        
-        // 自由视角界面隐藏骰子模型
         if (diceAnimator != null) diceAnimator.ShowDice(!isInFreeView);
-
-        if (CameraController.Instance != null) {
-            CameraController.Instance.SetFreeMode(isInFreeView);
-        }
-
+        if (CameraController.Instance != null) CameraController.Instance.SetFreeMode(isInFreeView);
         UIManager.Instance.SetViewButtonLabel(isInFreeView ? "返回" : "自由俯视");
-        
-        // 修改点：自由俯视角模式下隐藏卡牌按钮
         UIManager.Instance.cardButton.gameObject.SetActive(!isInFreeView);
         UIManager.Instance.actionButton.gameObject.SetActive(!isInFreeView);
     }
 
     public void CompleteCardAction() {
-        // 卡牌使用完成，重置状态
         StartTurn(); 
     }
 
     void StartDiceRoll() {
         if (isInFreeView) ToggleFreeView();
-        
         PlayerController p = GetCurrentPlayer();
         if (diceAnimator != null) diceAnimator.ShowDice(true);
-
         UIManager.Instance.SetExtraButtonsVisible(false);
         UIManager.Instance.HideActionButton();
         StartCoroutine(ProcessTurnSequence());
@@ -158,10 +130,18 @@ public class TurnManager : MonoBehaviour {
             yield break; 
         }
 
+        // 1. 计算点数，但不立即公布
         int steps = Random.Range(1, 7);
+        UIManager.Instance.UpdateStatus("骰子旋转中..."); 
+
+        // 2. 等待骰子旋转动画及缩放反馈结束
+        if (diceAnimator != null) {
+            yield return StartCoroutine(diceAnimator.PlayRollSequence(steps, null));
+        }
+
+        // 3. 动画结束后公布结果
         UIManager.Instance.UpdateStatus($"玩家 {p.playerId} 投出了 {steps} 点！");
-        
-        if (diceAnimator != null) yield return StartCoroutine(diceAnimator.PlayRollSequence(steps, null));
+        yield return new WaitForSeconds(0.5f); // 停留一下让玩家看清文字
 
         bool moveDone = false;
         p.StartMoving(steps, () => moveDone = true);

@@ -235,13 +235,13 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 228f94ba9c8cf4f348fbd92cd5aa3d57, type: 2}
   - {fileID: 11400000, guid: fa9dc0e8294af4955bd9f7b2db57742d, type: 2}
   barricadePrefab: {fileID: 1888194853599230624, guid: 3146f86dda80d419d969f57748e67a14, type: 3}
-  housePrefab: {fileID: 6299304802787343579, guid: a78de1d8e20a84c71bb3cb3f71da0019, type: 3}
+  housePrefab: {fileID: 1319817351213823019, guid: 399cdef97dd5449baa1d93490c2042f3, type: 3}
   iceEffectPrefab: {fileID: 1417109416525264207, guid: 6cb037c5634ee4110bc07fc9015edd66, type: 3}
   smokeEffectPrefab: {fileID: 4360349100514087828, guid: 5af978f9b85b89f4b8c026caf85fe44b, type: 3}
-  shopPrefab: {fileID: 6299304802787343579, guid: a78de1d8e20a84c71bb3cb3f71da0019, type: 3}
-  hospitalPrefab: {fileID: 6299304802787343579, guid: a78de1d8e20a84c71bb3cb3f71da0019, type: 3}
-  bankPrefab: {fileID: 6299304802787343579, guid: a78de1d8e20a84c71bb3cb3f71da0019, type: 3}
-  prisonPrefab: {fileID: 6299304802787343579, guid: a78de1d8e20a84c71bb3cb3f71da0019, type: 3}
+  shopPrefab: {fileID: 1319817351213823019, guid: 399cdef97dd5449baa1d93490c2042f3, type: 3}
+  hospitalPrefab: {fileID: 1319817351213823019, guid: 399cdef97dd5449baa1d93490c2042f3, type: 3}
+  bankPrefab: {fileID: 1319817351213823019, guid: 399cdef97dd5449baa1d93490c2042f3, type: 3}
+  prisonPrefab: {fileID: 1319817351213823019, guid: 399cdef97dd5449baa1d93490c2042f3, type: 3}
   dropHeight: 15
 --- !u!1 &96457048
 GameObject:
@@ -2503,6 +2503,8 @@ MonoBehaviour:
   idleSpinSpeed: 150
   rollSpinSpeed: 800
   transitionTime: 1
+  punchScaleAmount: 1.2
+  punchDuration: 0.3
   faceRotations:
   - {x: 180, y: 0, z: 0}
   - {x: -90, y: 0, z: 0}
@@ -3890,6 +3892,24 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 1520518211844720126, guid: 44d38d93672d74f0899e8c799444f54f, type: 3}
   m_PrefabInstance: {fileID: 8564512233239560720}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &1420317949
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1420317943}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5fea29bb7c508c244a1f805a5fd3fc4d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  outlineMode: 0
+  outlineColor: {r: 1, g: 1, b: 1, a: 1}
+  outlineWidth: 2
+  precomputeOutline: 0
+  bakeKeys: []
+  bakeValues: []
 --- !u!1 &1452923648
 GameObject:
   m_ObjectHideFlags: 0
@@ -4027,6 +4047,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c8e8274f498db4a2ea875f7da58aadc8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  houseLandingSFX: {fileID: 0}
+  shakeDuration: 0.4
+  shakeStrength: 0.6
 --- !u!1 &1540298191
 GameObject:
   m_ObjectHideFlags: 0
@@ -5660,7 +5683,10 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 2184852669853867844, guid: 44d38d93672d74f0899e8c799444f54f, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1420317949}
   m_SourcePrefab: {fileID: 100100000, guid: 44d38d93672d74f0899e8c799444f54f, type: 3}
 --- !u!1 &8861869086559567674
 GameObject:
