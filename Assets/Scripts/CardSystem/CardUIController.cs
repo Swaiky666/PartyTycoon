@@ -13,15 +13,13 @@ public class CardUIController : MonoBehaviour {
     public GameObject cardPrefab;       
 
     [Header("卡牌显示设置")]
-    public float cardWidth = 500f;     
-    public float cardHeight = 750f;    
     public float cardSpacing = 650f;   
     public float swipeSensitivity = 1.1f; 
 
     private List<GameObject> spawnedCards = new List<GameObject>();
     private List<CardBase> currentDataList;
     private float minX; 
-    private float maxX; 
+    // maxX 已删除，解决了 CS0414 警告
 
     void Awake() { Instance = this; }
 
@@ -43,9 +41,8 @@ public class CardUIController : MonoBehaviour {
         spawnedCards.Clear();
 
         contentHolder.anchorMin = contentHolder.anchorMax = contentHolder.pivot = new Vector2(0.5f, 0.5f);
-        contentHolder.sizeDelta = new Vector2(contentHolder.sizeDelta.x, cardHeight);
-
-        maxX = 0; 
+        
+        // maxX 直接设为0，minX 计算范围
         minX = -(currentDataList.Count - 1) * cardSpacing;
 
         for (int i = 0; i < currentDataList.Count; i++) {
@@ -54,7 +51,8 @@ public class CardUIController : MonoBehaviour {
             
             RectTransform rt = cardObj.GetComponent<RectTransform>();
             rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.sizeDelta = new Vector2(cardWidth, cardHeight); 
+            
+            // 保持 Inspector 原始大小，仅设置初始 X 位置
             rt.anchoredPosition = new Vector2(i * cardSpacing, 0);
             
             UpdateCardVisuals(cardObj, currentDataList[i]);
@@ -67,10 +65,13 @@ public class CardUIController : MonoBehaviour {
         contentHolder.anchoredPosition = Vector2.zero;
     }
 
+    // --- 补回被丢失的滑动处理函数 ---
+
     public void OnDragging(Vector2 delta) {
         DOTween.Kill(contentHolder);
         float newX = contentHolder.anchoredPosition.x + delta.x * swipeSensitivity;
-        newX = Mathf.Clamp(newX, minX - 300f, maxX + 300f);
+        // 增加一点边缘回弹感
+        newX = Mathf.Clamp(newX, minX - 300f, 300f); 
         contentHolder.anchoredPosition = new Vector2(newX, 0);
     }
 
@@ -79,9 +80,12 @@ public class CardUIController : MonoBehaviour {
         float predictedX = contentHolder.anchoredPosition.x + inertia;
         int targetIndex = Mathf.RoundToInt(-predictedX / cardSpacing);
         targetIndex = Mathf.Clamp(targetIndex, 0, currentDataList.Count - 1);
+        
         float finalX = -targetIndex * cardSpacing;
         contentHolder.DOAnchorPosX(finalX, 0.45f).SetEase(Ease.OutBack);
     }
+
+    // --------------------------------
 
     private void UpdateCardVisuals(GameObject cardObj, CardBase data) {
         TextMeshProUGUI[] texts = cardObj.GetComponentsInChildren<TextMeshProUGUI>();
@@ -91,38 +95,39 @@ public class CardUIController : MonoBehaviour {
             t.raycastTarget = false; 
         }
 
+        Transform bgTransform = cardObj.transform.Find("Background");
+        if (bgTransform != null) {
+            Image bgImg = bgTransform.GetComponent<Image>();
+            if (bgImg != null) bgImg.raycastTarget = true; 
+        }
+
         Transform iconTransform = cardObj.transform.Find("Icon");
         if (iconTransform != null) {
             Image img = iconTransform.GetComponent<Image>();
             if (img != null && data.cardIcon != null) {
                 img.sprite = data.cardIcon;
-                img.raycastTarget = false;
+                // 注意：这里没有改动 icon 的 raycastTarget
             }
         }
     }
 
-    // 关键修改点：点击具体卡牌后的行为
     public void OnCardClicked(int index) {
         if (currentDataList == null || index >= currentDataList.Count) return;
         CardBase selectedCard = currentDataList[index];
         
         cardUIPanel.SetActive(false);
 
-        // --- 核心修复：通知 TurnManager 进入目标选择模式（垂直俯视+平移） ---
         if (TurnManager.Instance != null) {
             TurnManager.Instance.EnterCardTargetingMode();
         }
 
         if (CardRangeFinder.Instance != null) CardRangeFinder.Instance.ShowRange(selectedCard);
         
-        // 将“道具卡”按钮配置为“取消”
         SetupCardButton("取消", () => {
             if (CardRangeFinder.Instance != null) CardRangeFinder.Instance.ClearHighlight();
-            // 取消后回到 StartTurn（会重置视角和 UI）
             if (TurnManager.Instance != null) TurnManager.Instance.StartTurn();
         });
 
-        // 确保“取消”按钮是激活的
         if (UIManager.Instance.cardButton != null) 
             UIManager.Instance.cardButton.gameObject.SetActive(true);
     }
