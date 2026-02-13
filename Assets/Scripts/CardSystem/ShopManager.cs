@@ -31,13 +31,9 @@ public class ShopManager : MonoBehaviour {
     }
 
     void Update() {
-        // 全局激光检测：点击空白处返回
         if (isInspecting && Input.GetMouseButtonDown(0)) {
             GameObject hitObject = GetOverlappingUIObject();
-            
-            // 如果点击的不是放大的卡牌本身，也不是 UI 上的任何按钮，就返回
             if (hitObject == null || (hitObject != selectedCardObj && hitObject.GetComponentInParent<Button>() == null)) {
-                Debug.Log("【激光检测】点击了非关键区域，返回列表。");
                 ShowListState();
             }
         }
@@ -52,18 +48,14 @@ public class ShopManager : MonoBehaviour {
     }
 
     public void OpenShop() {
-        Debug.Log("【商店系统】正在打开...");
         shopPanel.SetActive(true);
         currentGoods.Clear();
-        
         List<CardBase> pool = GameDataManager.Instance.allPossibleCards;
         if (pool == null || pool.Count == 0) return;
 
-        // 抽取5张，允许重复
         for (int i = 0; i < 5; i++) {
             currentGoods.Add(pool[Random.Range(0, pool.Count)]);
         }
-
         RefreshShopUI();
         ShowListState();
     }
@@ -76,11 +68,9 @@ public class ShopManager : MonoBehaviour {
             int index = i; 
             GameObject go = Instantiate(shopCardPrefab, slotTransforms[i]);
             go.name = "Card_" + i;
-            
             go.transform.localScale = shopCardPrefab.transform.localScale;
             go.transform.localPosition = Vector3.zero; 
 
-            // 适配新结构：Background 子物体
             Transform bgTrans = go.transform.Find("Background");
             if (bgTrans != null) {
                 Button btn = bgTrans.GetComponent<Button>();
@@ -90,7 +80,6 @@ public class ShopManager : MonoBehaviour {
                 }
                 SetCardInfo(go, bgTrans, currentGoods[i]);
             }
-
             spawnedCards.Add(go);
         }
     }
@@ -103,16 +92,8 @@ public class ShopManager : MonoBehaviour {
 
         if (nameTxt) nameTxt.text = data.cardName;
         if (descTxt) descTxt.text = data.description;
-        
-        // --- 核心改动：仅更新图片，不改动任何其他属性（颜色、射线检测等） ---
-        if (iconImg && data.cardIcon != null) {
-            iconImg.sprite = data.cardIcon;
-        }
-
-        // 背景图保持开启射线检测，确保按钮能点
-        if (bgImg != null) {
-            bgImg.raycastTarget = true;
-        }
+        if (iconImg && data.cardIcon != null) iconImg.sprite = data.cardIcon;
+        if (bgImg != null) bgImg.raycastTarget = true;
     }
 
     public void ShowListState() {
@@ -125,32 +106,26 @@ public class ShopManager : MonoBehaviour {
         for (int i = 0; i < spawnedCards.Count; i++) {
             if(spawnedCards[i] == null) continue;
             spawnedCards[i].SetActive(true);
-            
             spawnedCards[i].transform.SetParent(slotTransforms[i]); 
             spawnedCards[i].transform.localScale = shopCardPrefab.transform.localScale;
             spawnedCards[i].transform.localPosition = Vector3.zero;
         }
-
         UIManager.Instance.UpdateStatus("请选择卡牌");
         UIManager.Instance.ShowActionButton("退出商店", CloseShop);
     }
 
     void OnClickCard(int index, GameObject go) {
         if (index < 0 || index >= currentGoods.Count) return;
-
         selectedCard = currentGoods[index];
         selectedIndex = index;
         selectedCardObj = go;
         isInspecting = true; 
 
         for (int i = 0; i < spawnedCards.Count; i++) {
-            if (spawnedCards[i] != go && spawnedCards[i] != null) {
-                spawnedCards[i].SetActive(false);
-            }
+            if (spawnedCards[i] != go && spawnedCards[i] != null) spawnedCards[i].SetActive(false);
         }
 
         backgroundOverlay.gameObject.SetActive(true);
-
         go.transform.SetParent(shopPanel.transform); 
         go.transform.SetAsLastSibling();
         go.transform.DOScale(shopCardPrefab.transform.localScale * 1.5f, 0.3f);
@@ -162,13 +137,17 @@ public class ShopManager : MonoBehaviour {
 
     void BuyCurrent() {
         if (selectedIndex < 0 || selectedIndex >= currentGoods.Count) return;
-
         PlayerController p = TurnManager.Instance.GetCurrentPlayer();
+
+        // --- 核心新增：检查卡牌上限 ---
+        if (p.IsHandFull()) {
+            UIManager.Instance.UpdateStatus("<color=red>购买失败：卡牌包已满（上限 5 张）！</color>");
+            return; 
+        }
+
         if (p.money >= selectedCard.price) {
             p.ChangeMoney(-selectedCard.price);
-            // 实例化一份数据加入玩家背包
             p.cards.Add(Instantiate(selectedCard));
-            
             currentGoods.RemoveAt(selectedIndex);
             RefreshShopUI();
             ShowListState();

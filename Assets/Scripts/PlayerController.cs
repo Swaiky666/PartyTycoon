@@ -12,6 +12,9 @@ public class PlayerController : MonoBehaviour {
     
     public GameObject arrowPrefab; 
     public int money = 5000;
+
+    [Header("卡牌设置")]
+    public int maxCardCount = 5; // --- 新增功能：卡牌上限 ---
     public List<CardBase> startingCards = new List<CardBase>();
     [HideInInspector] public List<CardBase> cards = new List<CardBase>(); 
     
@@ -24,10 +27,15 @@ public class PlayerController : MonoBehaviour {
     private GameObject currentIceVisual;
 
     void Awake() {
-        // 初始化卡牌
+        // 初始化卡牌 (增加上限判断)
         foreach (var c in startingCards) {
-            if (c != null) cards.Add(Instantiate(c));
+            if (c != null && !IsHandFull()) cards.Add(Instantiate(c));
         }
+    }
+
+    // --- 新增功能：判断手牌是否已满 ---
+    public bool IsHandFull() {
+        return cards.Count >= maxCardCount;
     }
 
     // --- 存档系统专用接口 ---
@@ -67,7 +75,7 @@ public class PlayerController : MonoBehaviour {
         foreach (var r in rs) if (r != null) r.material.color = color;
     }
 
-    // --- 定位逻辑 (恢复了 Rigidbody 物理保护逻辑) ---
+    // --- 定位逻辑 (保留 Rigidbody 物理保护逻辑) ---
     public void SetInitialPosition(GridNode node) {
         if (node == null) return;
         currentGrid = node;
@@ -79,7 +87,7 @@ public class PlayerController : MonoBehaviour {
         
         transform.position = finalPos;
         
-        // 物理状态重置：防止切场景或传送时产生物理冲力
+        // 物理状态重置
         Rigidbody rb = GetComponent<Rigidbody>();
         if (rb != null) {
             rb.velocity = Vector3.zero;
@@ -97,7 +105,7 @@ public class PlayerController : MonoBehaviour {
         if (rb != null) rb.isKinematic = false;
     }
 
-    // --- 移动逻辑 (整合了防回退、路障、及分叉路选择) ---
+    // --- 移动逻辑 (整合防回退、路障、及分叉路选择) ---
     public void StartMoving(int steps, System.Action onComplete) {
         StartCoroutine(MoveRoutine(steps, onComplete));
     }
@@ -112,24 +120,20 @@ public class PlayerController : MonoBehaviour {
         while (remainingSteps > 0) {
             List<GridNode> validOptions = new List<GridNode>();
             
-            // 过滤掉刚才走过来的格子，实现“禁止往回走”
             foreach (var conn in currentGrid.connections) {
                 if (conn != null && conn != lastGrid) {
                     validOptions.Add(conn);
                 }
             }
 
-            // 如果走到了死胡同（除了来路没别的连接了），才允许回头
             if (validOptions.Count == 0 && lastGrid != null) {
                 validOptions.Add(lastGrid);
             }
 
             GridNode nextNode = null;
             if (validOptions.Count > 1) {
-                // 有多条路，显示箭头供玩家选择
                 yield return StartCoroutine(WaitForBranchSelection(validOptions, (selected) => nextNode = selected));
             } else if (validOptions.Count == 1) {
-                // 只有一条路，直接走
                 nextNode = validOptions[0];
             }
 
@@ -139,7 +143,6 @@ public class PlayerController : MonoBehaviour {
                 currentGrid = nextNode;
                 remainingSteps--;
 
-                // 路障检测
                 if (currentGrid.HasBarricade()) {
                     currentGrid.ClearBarricade();
                     UIManager.Instance.UpdateStatus("撞到路障！停止移动。");
@@ -162,7 +165,6 @@ public class PlayerController : MonoBehaviour {
             Quaternion rot = Quaternion.identity;
             Vector3 offset = Vector3.zero;
             
-            // 根据地块相对位置计算箭头的朝向和偏移
             if (Mathf.Abs(diff.x) > Mathf.Abs(diff.z)) {
                 if (diff.x > 0) { rot = Quaternion.Euler(0, 90, 0); offset = new Vector3(1.3f, 0, 0); }
                 else { rot = Quaternion.Euler(0, -90, 0); offset = new Vector3(-1.3f, 0, 0); }
@@ -178,7 +180,6 @@ public class PlayerController : MonoBehaviour {
         }
 
         while (chosenNode == null) yield return null;
-
         foreach (var a in activeArrows) Destroy(a);
         onSelected?.Invoke(chosenNode);
     }
@@ -189,8 +190,6 @@ public class PlayerController : MonoBehaviour {
 
         while (Vector3.Distance(transform.position, targetPos) > 0.01f) {
             transform.position = Vector3.MoveTowards(transform.position, targetPos, moveSpeed * Time.deltaTime);
-            
-            // 平滑转向目标地块
             Vector3 dir = (targetPos - transform.position).normalized;
             if (dir != Vector3.zero) {
                 transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(dir), rotationSpeed * Time.deltaTime);
