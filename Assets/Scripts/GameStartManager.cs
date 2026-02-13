@@ -16,10 +16,15 @@ public class GameStartManager : MonoBehaviour {
         UIManager.Instance.SetExtraButtonsVisible(false);
         UIManager.Instance.SetPlayerStatsVisible(false);
         
+        // 1. 无论是否加载，先尝试执行一次基础建筑生成
         InitMapBuildings();
+        
+        // 2. 实例化玩家 GameObject
         CreatePlayerInstances();
 
+        // 3. 检查存档
         if (GameDataManager.Instance != null && GameDataManager.Instance.savedPlayers.Count > 0) {
+            // 在 LoadGameState 内部现在也会检查并生成缺失的建筑
             GameDataManager.Instance.LoadGameState(players);
             ToTurnManagerFromLoad(); 
         } else {
@@ -30,10 +35,11 @@ public class GameStartManager : MonoBehaviour {
 
     void InitMapBuildings() {
         if (gridDatabase == null) return;
+        gridDatabase.RefreshCache();
         List<GridNode> allNodes = gridDatabase.GetAllNodes();
         foreach (GridNode node in allNodes) {
             if (node.currentBuilding != null) continue;
-
+            
             GameObject prefabToSpawn = null;
             switch (node.type) {
                 case GridType.Shop: prefabToSpawn = GameDataManager.Instance.shopPrefab; break;
@@ -41,28 +47,32 @@ public class GameStartManager : MonoBehaviour {
                 case GridType.Hospital: prefabToSpawn = GameDataManager.Instance.hospitalPrefab; break;
                 case GridType.Prison: prefabToSpawn = GameDataManager.Instance.prisonPrefab; break;
             }
-
+            
             if (prefabToSpawn != null && node.buildingAnchor != null) {
-                GameObject go = Instantiate(prefabToSpawn, node.buildingAnchor.position, node.buildingAnchor.rotation);
-                go.transform.SetParent(node.buildingAnchor);
-                node.currentBuilding = go;
+                GameObject b = Instantiate(prefabToSpawn, node.buildingAnchor.position, node.buildingAnchor.rotation);
+                b.transform.SetParent(node.buildingAnchor);
+                node.currentBuilding = b;
             }
         }
-        Debug.Log("【系统】数据库刷新完成，固定建筑已生成。");
     }
 
     void CreatePlayerInstances() {
         for (int i = 1; i <= 6; i++) {
-            GameObject go = Instantiate(playerPrefab);
-            PlayerController p = go.GetComponent<PlayerController>();
-            p.playerId = i;
-            players.Add(p);
+            GameObject pObj = Instantiate(playerPrefab);
+            PlayerController pc = pObj.GetComponent<PlayerController>();
+            pc.playerId = i;
+            players.Add(pc);
         }
     }
 
     void InitPlayersToStart() {
         GridNode startNode = startGrid.GetComponent<GridNode>();
-        foreach (var p in players) p.SetInitialPosition(startNode);
+        foreach (var p in players) {
+            p.currentGrid = startNode;
+            Vector3 pos = startNode.GetSlotPosition(p.gameObject);
+            pos.y += p.heightOffset;
+            p.transform.position = pos;
+        }
     }
 
     IEnumerator MainFlow() {
@@ -86,7 +96,7 @@ public class GameStartManager : MonoBehaviour {
 
     IEnumerator SimulateOthersRoll() {
         for (int i = 2; i <= 6; i++) {
-            yield return new WaitForSeconds(Random.Range(0.3f, 0.7f));
+            yield return new WaitForSeconds(Random.Range(0.2f, 0.5f));
             rollResults[i] = Random.Range(1, 7);
             CheckStatus();
         }
@@ -95,7 +105,7 @@ public class GameStartManager : MonoBehaviour {
     void CheckStatus() {
         if (rollResults.Count >= 6) {
             UIManager.Instance.UpdateStatus("顺序已定，正式开始！");
-            Invoke("ToTurnManager", 2f);
+            Invoke("ToTurnManager", 1.5f);
         }
     }
 
@@ -106,8 +116,7 @@ public class GameStartManager : MonoBehaviour {
     }
 
     void ToTurnManagerFromLoad() {
-        var sorted = players.OrderBy(p => p.playerId).ToList();
-        TurnManager.Instance.BeginGame(sorted);
+        TurnManager.Instance.BeginGameFromMinigame(players);
         gameObject.SetActive(false);
     }
 }
