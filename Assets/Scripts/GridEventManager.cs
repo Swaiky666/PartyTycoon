@@ -23,9 +23,21 @@ public class GridEventManager : MonoBehaviour {
             if (node.owner == null) {
                 if (player.money >= node.purchasePrice) {
                     bool decisionMade = false;
+                    bool isProcessing = false; // 局部逻辑锁，防止一帧内多次触发回调
+                    
                     UIManager.Instance.UpdateStatus($"空地待售：是否花费 ${node.purchasePrice} 购买？");
                     
+                    // 【配置：购买按钮】
                     UIManager.Instance.ShowActionButton("购买土地", () => {
+                        if (isProcessing) return; 
+                        isProcessing = true;
+                        
+                        // 立即隐藏所有相关按钮，防止连点
+                        UIManager.Instance.HideActionButton(); 
+                        if (UIManager.Instance.cardButton != null) 
+                            UIManager.Instance.cardButton.gameObject.SetActive(false);
+
+                        // 执行购买逻辑
                         player.ChangeMoney(-node.purchasePrice);
                         node.owner = player;
                         
@@ -37,7 +49,25 @@ public class GridEventManager : MonoBehaviour {
                         decisionMade = true;
                     });
 
-                    // 注意：这里建议在UIManager里再做一个“跳过”按钮，点击后也设 decisionMade = true
+                    // 【配置：放弃购买按钮】 (使用 cardButton 槽位)
+                    if (UIManager.Instance.cardButton != null) {
+                        UIManager.Instance.cardButton.gameObject.SetActive(true);
+                        UIManager.Instance.SetCardButtonLabel("放弃购买");
+                        UIManager.Instance.cardButton.onClick.RemoveAllListeners();
+                        UIManager.Instance.cardButton.onClick.AddListener(() => {
+                            if (isProcessing) return;
+                            isProcessing = true;
+
+                            // 清理 UI
+                            UIManager.Instance.HideActionButton();
+                            UIManager.Instance.cardButton.gameObject.SetActive(false);
+                            
+                            UIManager.Instance.UpdateStatus("已放弃购买该土地。");
+                            decisionMade = true;
+                        });
+                    }
+
+                    // 阻塞协程，直到玩家做出决定
                     while (!decisionMade) {
                         yield return null; 
                     }
