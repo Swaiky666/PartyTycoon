@@ -1,16 +1,21 @@
 using UnityEngine;
 using System.Collections;
-using DG.Tweening; // 确保引用了 DOTween
+using DG.Tweening; 
 
 public class DiceAnimator : MonoBehaviour {
     [Header("速度配置")]
     public float idleSpinSpeed = 150f;   
     public float rollSpinSpeed = 600f;   
+    [Tooltip("快速旋转持续的总时长")]
+    public float fastRollDuration = 1.0f; // 你需要的 Inspector 控制变量
     public float transitionTime = 1.5f; 
 
+    [Header("音效配置")]
+    public AudioClip rollingClip; // 骰子滚动时的循环音效
+
     [Header("打磨配置")]
-    public float punchScaleAmount = 1.2f; // 停止时放大的倍率（基于原始大小的比例）
-    public float punchDuration = 0.3f;    // 缩放动画的时长
+    public float punchScaleAmount = 1.2f; 
+    public float punchDuration = 0.3f;    
 
     [Header("6个点的角度(1-6)")]
     public Vector3[] faceRotations = new Vector3[6];
@@ -23,20 +28,15 @@ public class DiceAnimator : MonoBehaviour {
     private bool isLocking = false; 
     private float currentSpeed = 0f;
     private Quaternion targetQuaternion;
-    
-    // 用于记录你在 Inspector 中设置的原始大小
     private Vector3 originalScale;
 
     void Awake() {
         if (diceModel == null && transform.childCount > 0) {
             diceModel = transform.GetChild(0).gameObject;
         }
-        
-        // 核心修改：在最开始就记住你的缩放设置
         if (diceModel != null) {
             originalScale = diceModel.transform.localScale;
         }
-        
         ShowDice(false);
     }
 
@@ -44,39 +44,44 @@ public class DiceAnimator : MonoBehaviour {
         if (diceModel == null) return;
 
         if (isIdle || isRolling) {
-            float targetSpeed = isRolling ? rollSpinSpeed : (isIdle ? idleSpinSpeed : 0f);
-            currentSpeed = Mathf.Lerp(currentSpeed, targetSpeed, Time.deltaTime * 3f);
+            float speed = isRolling ? rollSpinSpeed : idleSpinSpeed;
+            currentSpeed = Mathf.Lerp(currentSpeed, speed, Time.deltaTime * 5f);
             diceModel.transform.Rotate(new Vector3(1f, 0.7f, 0.3f) * currentSpeed * Time.deltaTime);
         }
     }
 
+    public void ShowDice(bool show) {
+        gameObject.SetActive(show);
+        // 关闭显示时务必停止音效
+        if (!show && AudioManager.Instance != null) AudioManager.Instance.StopSFX();
+    }
+
     public void ShowAndIdle() {
-        ShowDice(true);
         isIdle = true;
         isRolling = false;
         isLocking = false;
+        currentSpeed = idleSpinSpeed;
+        // Idle 状态不播放音效，所以确保停止
+        if (AudioManager.Instance != null) AudioManager.Instance.StopSFX();
     }
 
-    public void ShowDice(bool show) {
-        if (diceModel != null) {
-            diceModel.SetActive(show);
-            // 确保显示/隐藏时恢复到你在 Inspector 设置的大小，不被动画残留干扰
-            diceModel.transform.localScale = originalScale;
-        }
-        isIdle = show;
-        if (!show) {
-            isRolling = false;
-            isLocking = false;
-            currentSpeed = 0;
-        }
-    }
-
-    public IEnumerator PlayRollSequence(int result, System.Action onFinished, bool autoHide = true) {
+    public IEnumerator PlayRollSequence(int result, System.Action onComplete) {
         isRolling = true;
         isIdle = false;
         isLocking = false;
+
+        // --- 开始播放骰子音效 ---
+        if (AudioManager.Instance != null && rollingClip != null) {
+            AudioManager.Instance.PlayLoopingSFX(rollingClip);
+        }
         
-        yield return new WaitForSeconds(0.8f); 
+        // 快速旋转阶段
+        yield return new WaitForSeconds(fastRollDuration); 
+
+        // --- 准备锁定结果，停止音效 ---
+        if (AudioManager.Instance != null) {
+            AudioManager.Instance.StopSFX();
+        }
 
         isRolling = false; 
         isLocking = true;
@@ -94,23 +99,17 @@ public class DiceAnimator : MonoBehaviour {
             yield return null;
         }
 
-        // 锁定结果
         diceModel.transform.localRotation = targetQuaternion;
         isLocking = false;
 
-        // --- 核心打磨：使用原始大小进行 Punch 动画 ---
-        // Vector3.Scale(originalScale, Vector3.one * (punchScaleAmount - 1f)) 确保增加的比例是基于原大小的
         Vector3 punchAmount = new Vector3(
             originalScale.x * (punchScaleAmount - 1f),
             originalScale.y * (punchScaleAmount - 1f),
             originalScale.z * (punchScaleAmount - 1f)
         );
-        diceModel.transform.DOPunchScale(punchAmount, punchDuration, 10, 1f);
+        diceModel.transform.DOPunchScale(punchAmount, punchDuration);
 
-        // 等待 1 秒让玩家看清结果，同时也等待缩放动画播完
-        yield return new WaitForSeconds(1.0f); 
-        
-        if (autoHide) ShowDice(false);
-        onFinished?.Invoke();
+        yield return new WaitForSeconds(0.2f);
+        onComplete?.Invoke();
     }
 }

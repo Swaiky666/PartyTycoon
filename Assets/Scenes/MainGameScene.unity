@@ -231,8 +231,6 @@ MonoBehaviour:
   database: {fileID: 11400000, guid: 092ab140f149d4dd5819dbc2c67c4cf3, type: 2}
   savedPlayers: []
   savedGrids: []
-  minigameScenes:
-  - MinigameScene
   allPossibleCards:
   - {fileID: 11400000, guid: 228f94ba9c8cf4f348fbd92cd5aa3d57, type: 2}
   - {fileID: 11400000, guid: fa9dc0e8294af4955bd9f7b2db57742d, type: 2}
@@ -1846,8 +1844,6 @@ MonoBehaviour:
   cardUIPanel: {fileID: 1142301787}
   contentHolder: {fileID: 132546992}
   cardPrefab: {fileID: 3193726809298855494, guid: d85c3130c29434b2da4e103cf9879ec7, type: 3}
-  cardWidth: 650
-  cardHeight: 1050
   cardSpacing: 600
   swipeSensitivity: 1
 --- !u!1 &852449576
@@ -2411,7 +2407,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   idleSpinSpeed: 150
   rollSpinSpeed: 800
+  fastRollDuration: 1
   transitionTime: 1
+  rollingClip: {fileID: 8300000, guid: 96053522e57a547418c8168d7123e646, type: 3}
   punchScaleAmount: 1.2
   punchDuration: 0.3
   faceRotations:
@@ -4202,6 +4200,55 @@ Transform:
   m_Children: []
   m_Father: {fileID: 2050199665}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1611597020
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1611597022}
+  - component: {fileID: 1611597021}
+  m_Layer: 0
+  m_Name: AudioManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1611597021
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1611597020}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8095d4c86e5a34d459f6bc85d807789e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  bgmSource: {fileID: 0}
+  sfxSource: {fileID: 0}
+  masterVolume: 1
+  bgmVolume: 0.8
+  sfxVolume: 1
+--- !u!4 &1611597022
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1611597020}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 1.6125195, y: 0.34866455, z: 1.7854575}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1670927001
 GameObject:
   m_ObjectHideFlags: 0
@@ -5722,3 +5769,4 @@ SceneRoots:
   - {fileID: 228669090}
   - {fileID: 1585320819}
   - {fileID: 725091504}
+  - {fileID: 1611597022}
