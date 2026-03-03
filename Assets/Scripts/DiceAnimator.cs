@@ -51,7 +51,7 @@ public class DiceAnimator : MonoBehaviour {
     }
 
     public void ShowDice(bool show) {
-        gameObject.SetActive(show);
+        diceModel.SetActive(show);
         // 关闭显示时务必停止音效
         if (!show && AudioManager.Instance != null) AudioManager.Instance.StopSFX();
     }
