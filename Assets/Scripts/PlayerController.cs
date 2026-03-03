@@ -138,8 +138,9 @@ public class PlayerController : MonoBehaviour {
             }
 
             if (nextNode != null) {
-                lastGrid = currentGrid; 
-                yield return StartCoroutine(MoveToNode(nextNode));
+                currentGrid.RemovePlayer(gameObject); // 离开旧格，释放槽位
+                lastGrid = currentGrid;
+                yield return StartCoroutine(MoveToNode(nextNode)); // MoveToNode 内会调用 GetSlotPosition 加入新格
                 currentGrid = nextNode;
                 remainingSteps--;
 

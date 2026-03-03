@@ -94,7 +94,7 @@ public class TurnManager : MonoBehaviour {
         UIManager.Instance.HideActionButton();
         
         PlayerController p = GetCurrentPlayer();
-        NetworkManager.Instance.SendRollDiceRequest(p.playerId);
+        GameNetworkManager.Instance.SendRollDiceRequest(p.playerId);
     }
 
     // 核心广播：收到网络点数后执行
@@ -108,13 +108,12 @@ public class TurnManager : MonoBehaviour {
     }
 
     IEnumerator ProcessTurnSequenceNet(PlayerController p, int steps) {
-        // 保留冰冻检查
-        if (p.remainingFreezeTurns > 0) {
-            UIManager.Instance.UpdateStatus($"玩家 {p.playerId} 冰冻中...");
+        // 冰冻检查：CheckFreezeStatus() 负责递减计数、更新 UI、解冻
+        if (p.CheckFreezeStatus()) {
             if (diceAnimator != null) diceAnimator.ShowDice(false);
             yield return new WaitForSeconds(2.0f);
-            EndTurn();
-            yield break; 
+            GameNetworkManager.Instance.SendEndTurnRequest(p.playerId);
+            yield break;
         }
 
         UIManager.Instance.UpdateStatus("骰子旋转中..."); 
@@ -138,7 +137,7 @@ public class TurnManager : MonoBehaviour {
         }
 
         yield return new WaitForSeconds(1.0f);
-        EndTurn();
+        GameNetworkManager.Instance.SendEndTurnRequest(p.playerId);
     }
 
     // --- 视图与卡牌 (保留单机版所有功能) ---
@@ -170,6 +169,18 @@ public class TurnManager : MonoBehaviour {
         if (diceAnimator != null) diceAnimator.ShowDice(false);
         currentIndex = (currentIndex + 1) % turnOrder.Count;
         StartTurn();
+    }
+
+    /// <summary>
+    /// [网络广播] 执行回合结束（来自 GameNetworkManager）
+    /// </summary>
+    public void ExecuteNetEndTurn(int playerId)
+    {
+        // 校验是否是当前玩家
+        PlayerController p = GetCurrentPlayer();
+        if (p == null || p.playerId != playerId) return;
+
+        EndTurn();
     }
 
     IEnumerator EnterMinigameFlow() {

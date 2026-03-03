@@ -19,10 +19,10 @@ public class FreezeCard : CardBase {
             }
         }
 
-        if (hit) {
-            user.cards.Remove(this);
-            return true;
+        if (!hit) {
+            UIManager.Instance.UpdateStatus("该格没有可冻结的玩家！");
         }
-        return false;
+        // 注意：卡牌移除由 CardRangeFinder.ConfirmUse() 统一处理，此处不重复 Remove
+        return hit;
     }
 }

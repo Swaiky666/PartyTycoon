@@ -35,7 +35,7 @@
   - 大地图：状态同步（State Sync，服务端权威判断）
   - 小游戏：帧同步（Frame Sync / Lockstep，66ms/帧，保证操作手感）
 - **资源管理**：Addressables（按需远程下载，常驻资源除外）
-- **网络（当前）**：本地模拟中间层（`NetworkManager.cs`）
+- **网络（当前）**：本地模拟中间层（`GameNetworkManager.cs`）
 - **网络（规划）**：微信 MGOBE 或自建服务器 SDK
 
 ---
@@ -46,7 +46,7 @@
 Assets/
 ├── Scripts/
 │   ├── Network/
-│   │   └── NetworkManager.cs        ← 网络中间层（唯一联网切换点）
+│   │   └── GameNetworkManager.cs    ← 游戏网络中间层（唯一联网切换点）
 │   ├── CardSystem/
 │   │   ├── CardBase.cs              ← 卡牌基类 ScriptableObject
 │   │   ├── CardRangeFinder.cs       ← 卡牌范围高亮 + 点击检测
@@ -104,7 +104,7 @@ TurnManager.StartTurn()
 
 ### 网络中间层设计（关键）
 
-`Assets/Scripts/Network/NetworkManager.cs` 是**唯一的联网切换点**。
+`Assets/Scripts/Network/GameNetworkManager.cs` 是**唯一的联网切换点**。
 
 **当前（模拟阶段）**：
 - `SendRollDiceRequest()` → 本地协程模拟延迟 → 直接回调 `TurnManager.ExecuteNetRollDice()`
@@ -148,7 +148,7 @@ TurnManager.StartTurn()
 - [x] 相机震动（DOTween）
 - [x] 音频系统（BGM + SFX 分离）
 - [x] 编辑器工具（地块自动排布/路径连接/站位管理）
-- [x] 模拟联网中间层（NetworkManager，骰子请求/广播已拆分）
+- [x] 模拟联网中间层（GameNetworkManager，骰子请求/广播已拆分）
 
 ---
 
@@ -157,7 +157,7 @@ TurnManager.StartTurn()
 ### 当前重点：完善单机核心规则 + 模拟联网
 
 - [ ] **EndTurn 网络化**：`SendEndTurnRequest()` → 广播切换回合
-- [ ] **金钱/房产同步**：`SyncMoneyChange()`、`SyncPropertyOwner()`
+- [ ] **金钱/房产同步**：`SendMoneyChangeRequest()`、`SendBuyPropertyRequest()`
 - [ ] **税收系统**：`TurnCounter` 每 3 回合增加全局 `TaxMultiplier`（含 UI 滚动提示动效）
 - [ ] **伤害系统**：受伤扣 `资金 × 20%`（暂定，待测试）
 - [ ] **淘汰机制**：资金 ≤ 0 时触发淘汰，清空名下所有房产
@@ -284,7 +284,7 @@ TurnManager.StartTurn()
 ### 绝对不能动的东西
 
 - `GameDataManager`：必须保持 `DontDestroyOnLoad`，是跨场景数据载体
-- `NetworkManager`：必须保持 `DontDestroyOnLoad`，是联网状态持有者
+- `GameNetworkManager`：必须保持 `DontDestroyOnLoad`，是联网状态持有者
 - `AudioManager`：必须保持 `DontDestroyOnLoad`，切场景不断音乐
 - `GridNode.connections[]`：固定长度 4（上下左右），不要改成 List
 - `GridNode.slotPoints[]`：固定长度 6（最多6玩家站位）
@@ -294,7 +294,7 @@ TurnManager.StartTurn()
 
 | 场景名 | 用途 |
 |--------|------|
-| `MainBoardScene` | 主棋盘游戏场景 |
+| `MainGameScene` | 主棋盘游戏场景 |
 | `MinigameScene` | 小游戏通用入口（按抽到的游戏动态加载对应 Label） |
 
 ### 美术技术规范
@@ -323,12 +323,12 @@ TurnManager.StartTurn()
 **正在实现：模拟联网回合同步**
 
 核心文件：
-- `Assets/Scripts/Network/NetworkManager.cs`：模拟服务端，目前处理骰子请求和广播
+- `Assets/Scripts/Network/GameNetworkManager.cs`：模拟服务端，处理骰子/金钱/房产等请求和广播
 - `Assets/Scripts/TurnManager.cs`：已拆分为「发请求 `SendRollDiceRequest`」和「收广播执行 `ExecuteNetRollDice`」两个阶段
 
 **下一步（按顺序）**：
-1. `NetworkManager` 新增 `SendEndTurnRequest()` 方法
-2. `GridEventManager` 中金钱变动接入 `NetworkManager.SyncMoneyChange()`
+1. `GameNetworkManager` 新增 `SendEndTurnRequest()` 方法
+2. `GridEventManager` 中金钱变动接入 `GameNetworkManager.SendMoneyChangeRequest()`
 3. 实现税收 `TaxMultiplier` 系统（`TurnManager` 内每 3 回合触发，含 UI 提示）
 4. 实现淘汰判断（`PlayerController.ChangeMoney` 检测资金 ≤ 0 时触发）
 
@@ -346,7 +346,7 @@ A：检查 `DiceAnimator.diceModel` 是否为 null，以及 `fastRollDuration` �
 A：`LoadGameState` 依赖 `GridDatabase.RefreshCache()`，确保加载场景后所有 GridNode 全部激活后再调用。
 
 **Q：新增联网功能的正确步骤？**  
-A：① `NetworkManager` 加 `SendXxxRequest()` → ② 加私有协程模拟服务端处理 → ③ 回调对应 Manager 的 `ExecuteNetXxx()` → ④ 业务逻辑触发点改调 `NetworkManager.Instance.SendXxxRequest()`。
+A：① `GameNetworkManager` 加 `SendXxxRequest()` → ② 加私有协程模拟服务端处理 → ③ 回调对应 Manager 的 `ExecuteNetXxx()` → ④ 业务逻辑触发点改调 `GameNetworkManager.Instance.SendXxxRequest()`。
 
 **Q：大地图状态同步和小游戏帧同步有什么区别？**  
 A：大地图是回合制，延迟容忍高，服务端直接广播最终状态结果。小游戏是实时对抗，改用 Lockstep：每 66ms 收集本地输入发给服务端，服务端广播所有人的输入后，每个客户端用相同输入本地推算结果，保证帧一致性，不直接同步位置。

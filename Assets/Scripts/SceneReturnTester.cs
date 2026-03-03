@@ -4,7 +4,7 @@ using UnityEngine.SceneManagement;
 
 public class SceneReturnTester : MonoBehaviour {
     public Button returnButton;
-    public string mainSceneName = "MainBoardScene"; // 你的主地图场景名
+    public string mainSceneName = "MainGameScene"; // 主地图场景名
 
     void Start() {
         if (returnButton != null) {

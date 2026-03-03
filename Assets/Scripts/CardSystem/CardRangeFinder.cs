@@ -19,8 +19,10 @@ public class CardRangeFinder : MonoBehaviour {
         ClearHighlight(); // 先清理，确保状态干净
         
         PlayerController p = TurnManager.Instance.GetCurrentPlayer();
-        // 计算 BFS 范围
-        highlightedNodes = CalculateRange(p.currentGrid, card.rangeStraight, card.rangeAdjacent);
+        // rangeStraight 和 rangeAdjacent 取较大值作为 BFS 深度
+        // 未来可在此处分别实现"直线范围"与"全向范围"的差异化逻辑
+        int effectiveRange = Mathf.Max(card.rangeStraight, card.rangeAdjacent);
+        highlightedNodes = CalculateRange(p.currentGrid, effectiveRange);
         
         Debug.Log($"【卡牌系统】正在为 {highlightedNodes.Count} 个地块激活交互能力...");
 
@@ -54,7 +56,7 @@ public class CardRangeFinder : MonoBehaviour {
         }
     }
 
-    private List<GridNode> CalculateRange(GridNode center, int straightLimit, int adjacentLimit) {
+    private List<GridNode> CalculateRange(GridNode center, int range) {
         List<GridNode> results = new List<GridNode>();
         Queue<(GridNode node, int dist)> queue = new Queue<(GridNode, int)>();
         queue.Enqueue((center, 0));
@@ -63,9 +65,9 @@ public class CardRangeFinder : MonoBehaviour {
 
         while (queue.Count > 0) {
             var current = queue.Dequeue();
-            if (current.dist > 0) results.Add(current.node); 
+            if (current.dist > 0) results.Add(current.node);
 
-            if (current.dist < adjacentLimit) {
+            if (current.dist < range) {
                 foreach (var next in current.node.connections) {
                     if (next != null && !visited.Contains(next)) {
                         visited.Add(next);

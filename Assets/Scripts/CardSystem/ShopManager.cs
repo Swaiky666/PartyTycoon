@@ -139,21 +139,33 @@ public class ShopManager : MonoBehaviour {
         if (selectedIndex < 0 || selectedIndex >= currentGoods.Count) return;
         PlayerController p = TurnManager.Instance.GetCurrentPlayer();
 
-        // --- 核心新增：检查卡牌上限 ---
+        // UI 层前置拦截（快速反馈，服务端会再次权威校验）
         if (p.IsHandFull()) {
-            UIManager.Instance.UpdateStatus("<color=red>购买失败：卡牌包已满（上限 5 张）！</color>");
-            return; 
+            UIManager.Instance.UpdateStatus("<color=red>购买失败：卡牌包已满！</color>");
+            return;
+        }
+        if (p.money < selectedCard.price) {
+            UIManager.Instance.UpdateStatus("<color=red>金币不足！</color>");
+            return;
         }
 
-        if (p.money >= selectedCard.price) {
-            p.ChangeMoney(-selectedCard.price);
-            p.cards.Add(Instantiate(selectedCard));
-            currentGoods.RemoveAt(selectedIndex);
-            RefreshShopUI();
-            ShowListState();
-        } else {
-            UIManager.Instance.UpdateStatus("<color=red>金币不足！</color>");
-        }
+        // 捕获当前选择，防止异步回调时 selectedCard/selectedIndex 已变更
+        CardBase cardToBuy = selectedCard;
+        int indexToRemove = selectedIndex;
+
+        // [网络] 服务端权威购买：验证 → 扣款 → 加入手牌
+        GameNetworkManager.Instance.SendBuyCardRequest(
+            p.playerId, cardToBuy.cardName, cardToBuy.price,
+            onComplete: (success) => {
+                if (success) {
+                    currentGoods.RemoveAt(indexToRemove);
+                    RefreshShopUI();
+                    ShowListState();
+                } else {
+                    UIManager.Instance.UpdateStatus("<color=red>购买失败，请重试</color>");
+                }
+            }
+        );
     }
 
     public void CloseShop() {

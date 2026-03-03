@@ -4,29 +4,29 @@ using System.Collections.Generic;
 using System.Linq;
 
 public class GameStartManager : MonoBehaviour {
+    public static GameStartManager Instance;
+
     public GridDatabase gridDatabase;
     public GameObject playerPrefab;
     public Transform startGrid;
-    public DiceAnimator diceAnimator; 
+    public DiceAnimator diceAnimator;
 
     private List<PlayerController> players = new List<PlayerController>();
-    private Dictionary<int, int> rollResults = new Dictionary<int, int>();
+
+    void Awake() {
+        Instance = this;
+    }
 
     void Start() {
         UIManager.Instance.SetExtraButtonsVisible(false);
         UIManager.Instance.SetPlayerStatsVisible(false);
-        
-        // 1. 无论是否加载，先尝试执行一次基础建筑生成
+
         InitMapBuildings();
-        
-        // 2. 实例化玩家 GameObject
         CreatePlayerInstances();
 
-        // 3. 检查存档
         if (GameDataManager.Instance != null && GameDataManager.Instance.savedPlayers.Count > 0) {
-            // 在 LoadGameState 内部现在也会检查并生成缺失的建筑
             GameDataManager.Instance.LoadGameState(players);
-            ToTurnManagerFromLoad(); 
+            ToTurnManagerFromLoad();
         } else {
             InitPlayersToStart();
             StartCoroutine(MainFlow());
@@ -39,15 +39,15 @@ public class GameStartManager : MonoBehaviour {
         List<GridNode> allNodes = gridDatabase.GetAllNodes();
         foreach (GridNode node in allNodes) {
             if (node.currentBuilding != null) continue;
-            
+
             GameObject prefabToSpawn = null;
             switch (node.type) {
-                case GridType.Shop: prefabToSpawn = GameDataManager.Instance.shopPrefab; break;
-                case GridType.Bank: prefabToSpawn = GameDataManager.Instance.bankPrefab; break;
+                case GridType.Shop:     prefabToSpawn = GameDataManager.Instance.shopPrefab;     break;
+                case GridType.Bank:     prefabToSpawn = GameDataManager.Instance.bankPrefab;     break;
                 case GridType.Hospital: prefabToSpawn = GameDataManager.Instance.hospitalPrefab; break;
-                case GridType.Prison: prefabToSpawn = GameDataManager.Instance.prisonPrefab; break;
+                case GridType.Prison:   prefabToSpawn = GameDataManager.Instance.prisonPrefab;   break;
             }
-            
+
             if (prefabToSpawn != null && node.buildingAnchor != null) {
                 GameObject b = Instantiate(prefabToSpawn, node.buildingAnchor.position, node.buildingAnchor.rotation);
                 b.transform.SetParent(node.buildingAnchor);
@@ -80,41 +80,55 @@ public class GameStartManager : MonoBehaviour {
         yield return new WaitForSeconds(1.0f);
         diceAnimator.ShowDice(true);
         diceAnimator.ShowAndIdle();
+
         UIManager.Instance.ShowActionButton("决定顺序", () => {
             UIManager.Instance.HideActionButton();
+            // 告诉服务端本局玩家数量，并清除上一局残留数据
+            GameNetworkManager.Instance.ResetOrderRolls(players.Count);
             StartCoroutine(HandleLocalRoll());
             StartCoroutine(SimulateOthersRoll());
         });
     }
 
+    // 本地玩家（玩家1）：播放骰子动画后将结果发给服务端
     IEnumerator HandleLocalRoll() {
         int result = Random.Range(1, 7);
         yield return StartCoroutine(diceAnimator.PlayRollSequence(result, null));
-        rollResults[1] = result;
-        CheckStatus();
+        // [网络] 发送本地玩家骰子结果，服务端收齐后广播顺序
+        GameNetworkManager.Instance.SendRollForOrderRequest(players[0].playerId, result);
     }
 
+    // 其他玩家（模拟阶段本地代劳）：逐一延迟发送各自结果给服务端
     IEnumerator SimulateOthersRoll() {
-        for (int i = 2; i <= 6; i++) {
+        for (int i = 1; i < players.Count; i++) {
             yield return new WaitForSeconds(Random.Range(0.2f, 0.5f));
-            rollResults[i] = Random.Range(1, 7);
-            CheckStatus();
+            int result = Random.Range(1, 7);
+            // [网络] 真实联网时，这里改为等待其他客户端自己发送
+            GameNetworkManager.Instance.SendRollForOrderRequest(players[i].playerId, result);
         }
     }
 
-    void CheckStatus() {
-        if (rollResults.Count >= 6) {
-            UIManager.Instance.UpdateStatus("顺序已定，正式开始！");
-            Invoke("ToTurnManager", 1.5f);
-        }
+    /// <summary>
+    /// [网络广播] 服务端收齐所有骰子后回调，下发最终出场顺序
+    /// </summary>
+    public void ExecuteNetFinalizeOrder(List<int> sortedPlayerIds) {
+        UIManager.Instance.UpdateStatus("顺序已定，正式开始！");
+
+        List<PlayerController> sorted = sortedPlayerIds
+            .Select(id => players.Find(p => p.playerId == id))
+            .Where(p => p != null)
+            .ToList();
+
+        StartCoroutine(DelayedStartGame(sorted));
     }
 
-    void ToTurnManager() {
-        var sorted = players.OrderByDescending(p => rollResults[p.playerId]).ToList();
+    private IEnumerator DelayedStartGame(List<PlayerController> sorted) {
+        yield return new WaitForSeconds(1.5f);
         TurnManager.Instance.BeginGame(sorted);
         gameObject.SetActive(false);
     }
 
+    // 从小游戏返回时直接进入回合，不需要掷骰决定顺序
     void ToTurnManagerFromLoad() {
         TurnManager.Instance.BeginGameFromMinigame(players);
         gameObject.SetActive(false);

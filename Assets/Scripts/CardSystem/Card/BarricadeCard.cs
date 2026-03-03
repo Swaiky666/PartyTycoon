@@ -12,12 +12,12 @@ public class BarricadeCard : CardBase {
         Debug.Log($"{user.playerId} 在地块 {target.name} 上放置了路障！");
 
         if (barricadePrefab != null) {
-            GameObject barricade = Instantiate(barricadePrefab, target.transform.position, Quaternion.identity);
-            // 关键：建立地块与路障的关联
+            // 加 0.3f 高度偏移防止路障埋入地面
+            GameObject barricade = Instantiate(barricadePrefab, target.transform.position + Vector3.up * 0.3f, Quaternion.identity);
             target.currentBarricade = barricade;
         }
 
-        user.cards.Remove(this);
+        // 注意：卡牌移除由 CardRangeFinder.ConfirmUse() 统一处理，此处不重复 Remove
         return true;
     }
 }

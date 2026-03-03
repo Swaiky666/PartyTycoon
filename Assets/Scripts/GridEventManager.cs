@@ -29,24 +29,18 @@ public class GridEventManager : MonoBehaviour {
                     
                     // 【配置：购买按钮】
                     UIManager.Instance.ShowActionButton("购买土地", () => {
-                        if (isProcessing) return; 
+                        if (isProcessing) return;
                         isProcessing = true;
-                        
-                        // 立即隐藏所有相关按钮，防止连点
-                        UIManager.Instance.HideActionButton(); 
-                        if (UIManager.Instance.cardButton != null) 
+
+                        UIManager.Instance.HideActionButton();
+                        if (UIManager.Instance.cardButton != null)
                             UIManager.Instance.cardButton.gameObject.SetActive(false);
 
-                        // 执行购买逻辑
-                        player.ChangeMoney(-node.purchasePrice);
-                        node.owner = player;
-                        
-                        if (node.buildingAnchor != null && GameDataManager.Instance.housePrefab != null) {
-                            StartCoroutine(PlayEnhancedHouseDropAnimation(node));
-                        }
-
-                        node.GetComponent<Renderer>().material.color = new Color(0.6f, 1f, 0.6f); 
-                        decisionMade = true;
+                        // [网络] 服务端权威购买：验证金钱 → 扣款 → 设归属 → 触发建筑动画
+                        GameNetworkManager.Instance.SendBuyPropertyRequest(
+                            player.playerId, node.gridId, node.purchasePrice,
+                            onComplete: (_) => decisionMade = true
+                        );
                     });
 
                     // 【配置：放弃购买按钮】 (使用 cardButton 槽位)
@@ -76,8 +70,15 @@ public class GridEventManager : MonoBehaviour {
             else if (node.owner != player) {
                 int rent = node.rentPrice;
                 UIManager.Instance.UpdateStatus($"踏入玩家 {node.owner.playerId} 的领地，支付租金 ${rent}");
-                player.ChangeMoney(-rent);
-                node.owner.ChangeMoney(rent);
+
+                // [网络] 服务端原子执行：付款方扣钱 + 收款方加钱，双方同步
+                bool rentDone = false;
+                GameNetworkManager.Instance.SendRentRequest(
+                    player.playerId, node.owner.playerId, rent,
+                    onComplete: () => rentDone = true
+                );
+                while (!rentDone) yield return null;
+
                 yield return new WaitForSeconds(1.5f);
             }
         }
