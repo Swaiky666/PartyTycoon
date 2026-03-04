@@ -2,6 +2,7 @@ using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 
 public class UIManager : MonoBehaviour {
@@ -13,9 +14,12 @@ public class UIManager : MonoBehaviour {
     public Button actionButton;              
 
     [Header("功能切换按钮")]
-    public Button viewButton;  
+    public Button viewButton;
     public Button cardButton;
-    public Button testSwitchSceneButton; 
+    public Button testSwitchSceneButton;
+
+    [Header("税收通知（可选）")]
+    public TextMeshProUGUI taxNotificationText;
 
     private TextMeshProUGUI buttonText;      
 
@@ -83,5 +87,38 @@ public class UIManager : MonoBehaviour {
             var txt = cardButton.GetComponentInChildren<TextMeshProUGUI>();
             if(txt != null) txt.text = label;
         }
+    }
+
+    /// <summary>显示税率变动通知，渐入 0.3s → 停留 2.5s → 渐出 0.5s</summary>
+    public void ShowTaxNotification(string message) {
+        if (taxNotificationText == null) return;
+        StopCoroutine("TaxNotificationRoutine");
+        StartCoroutine(TaxNotificationRoutine(message));
+    }
+
+    private IEnumerator TaxNotificationRoutine(string message) {
+        taxNotificationText.text = message;
+        taxNotificationText.gameObject.SetActive(true);
+
+        Color c = taxNotificationText.color;
+        c.a = 0f;
+        taxNotificationText.color = c;
+
+        for (float t = 0f; t < 0.3f; t += Time.deltaTime) {
+            c.a = t / 0.3f;
+            taxNotificationText.color = c;
+            yield return null;
+        }
+        c.a = 1f;
+        taxNotificationText.color = c;
+
+        yield return new WaitForSeconds(2.5f);
+
+        for (float t = 0f; t < 0.5f; t += Time.deltaTime) {
+            c.a = 1f - t / 0.5f;
+            taxNotificationText.color = c;
+            yield return null;
+        }
+        taxNotificationText.gameObject.SetActive(false);
     }
 }

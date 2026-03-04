@@ -130,7 +130,9 @@ public class GameStartManager : MonoBehaviour {
 
     // 从小游戏返回时直接进入回合，不需要掷骰决定顺序
     void ToTurnManagerFromLoad() {
-        TurnManager.Instance.BeginGameFromMinigame(players);
+        // 过滤掉已淘汰玩家（存档里没有记录的视为已淘汰，LoadGameState 不会恢复他们，currentGrid 为 null）
+        List<PlayerController> survivors = players.FindAll(p => p.currentGrid != null);
+        TurnManager.Instance.BeginGameFromMinigame(survivors);
         gameObject.SetActive(false);
     }
 }

@@ -7,16 +7,29 @@ public class TurnManager : MonoBehaviour {
     public static TurnManager Instance;
 
     [Header("引用")]
-    public DiceAnimator diceAnimator; 
-    
+    public DiceAnimator diceAnimator;
+
+    [Header("税收系统")]
+    [Tooltip("每次税率上涨幅度（0.05 = 5%）")]
+    public float taxRateStep = 0.05f;
+    [Tooltip("每隔几轮涨一次税")]
+    public int taxRoundInterval = 3;
+
+    [Header("小游戏系统")]
+    [Tooltip("每隔几轮进入一次小游戏（0 = 禁用）")]
+    public int minigameRoundInterval = 3;
+
     public List<PlayerController> allPlayers => turnOrder;
+
+    [HideInInspector] public float currentTaxRate = 0f;
+    private int roundCount = 0;
 
     private List<PlayerController> turnOrder;
     private int currentIndex = 0;
     private bool isGameActive = false;
-    private bool isInFreeView = false;  
-    private bool isInCardMode = false;  
-    private string originalStatusText = ""; 
+    private bool isInFreeView = false;
+    private bool isInCardMode = false;
+    private string originalStatusText = "";
 
     void Awake() { 
         if (Instance == null) Instance = this; 
@@ -66,7 +79,7 @@ public class TurnManager : MonoBehaviour {
         originalStatusText = $"当前回合：玩家 {p.playerId}";
         UIManager.Instance.UpdateStatus(originalStatusText);
         
-        if (diceAnimator != null) diceAnimator.ShowAndIdle();
+        if (diceAnimator != null) { diceAnimator.ShowDice(true); diceAnimator.ShowAndIdle(); }
         
         // --- 模拟阶段：为当前玩家直接开放 UI ---
         UIManager.Instance.ShowActionButton("投掷骰子", () => StartDiceRollRequest());
@@ -116,9 +129,10 @@ public class TurnManager : MonoBehaviour {
             yield break;
         }
 
-        UIManager.Instance.UpdateStatus("骰子旋转中..."); 
+        UIManager.Instance.UpdateStatus("骰子旋转中...");
         if (diceAnimator != null) {
             yield return StartCoroutine(diceAnimator.PlayRollSequence(steps, null));
+            diceAnimator.ShowDice(false); // 掷出结果后隐藏，移动/事件阶段不显示骰子
         }
 
         UIManager.Instance.UpdateStatus($"玩家 {p.playerId} 投出了 {steps} 点！");
@@ -166,8 +180,27 @@ public class TurnManager : MonoBehaviour {
     }
 
     void EndTurn() {
-        if (diceAnimator != null) diceAnimator.ShowDice(false);
         currentIndex = (currentIndex + 1) % turnOrder.Count;
+
+        // 所有玩家都走完一次 = 一轮结束
+        if (currentIndex == 0) {
+            roundCount++;
+
+            // 税率检查
+            if (roundCount % taxRoundInterval == 0) {
+                currentTaxRate += taxRateStep;
+                UIManager.Instance.ShowTaxNotification(
+                    $"<color=red>税率上涨！当前税率：{currentTaxRate * 100:0}%</color>");
+                Debug.Log($"<color=orange>[税收] 第 {roundCount} 轮结束，税率升至 {currentTaxRate * 100:0}%</color>");
+            }
+
+            // 小游戏触发
+            if (minigameRoundInterval > 0 && roundCount % minigameRoundInterval == 0) {
+                StartCoroutine(EnterMinigameFlow());
+                return; // 不进入下一回合，等待场景切换
+            }
+        }
+
         StartTurn();
     }
 
@@ -199,5 +232,75 @@ public class TurnManager : MonoBehaviour {
         if (CameraController.Instance != null) CameraController.Instance.SetFreeMode(true);
         UIManager.Instance.viewButton.gameObject.SetActive(false);
         UIManager.Instance.actionButton.gameObject.SetActive(false);
+    }
+
+    //========================================
+    // 淘汰机制
+    //========================================
+
+    /// <summary>
+    /// 淘汰指定玩家：清空房产 → 移出回合序列 → 检查游戏结束。
+    /// 由 GameNetworkManager 在任何扣钱导致资金 ≤ 0 后调用。
+    /// </summary>
+    public void EliminatePlayer(PlayerController player)
+    {
+        if (turnOrder == null || !turnOrder.Contains(player)) return;
+
+        Debug.Log($"<color=red>[淘汰] 玩家 {player.playerId} 资金耗尽，退出游戏</color>");
+        UIManager.Instance.UpdateStatus($"<color=red>玩家 {player.playerId} 已被淘汰！</color>");
+
+        // 1. 清空名下所有房产
+        var allNodes = GameDataManager.Instance?.database?.GetAllNodes();
+        if (allNodes != null)
+        {
+            foreach (var node in allNodes)
+            {
+                if (node.owner != player) continue;
+                node.owner = null;
+                if (node.currentBuilding != null) { Destroy(node.currentBuilding); node.currentBuilding = null; }
+                Renderer rend = node.GetComponent<Renderer>();
+                if (rend != null) rend.material.color = Color.white;
+            }
+        }
+
+        // 2. 隐藏玩家模型
+        player.gameObject.SetActive(false);
+
+        // 3. 调整 currentIndex 后再移出列表
+        bool wasCurrentPlayer = (turnOrder[currentIndex] == player);
+        int playerIndex = turnOrder.IndexOf(player);
+        turnOrder.Remove(player);
+
+        if (playerIndex < currentIndex)
+            currentIndex--;           // 被移出的在当前之前，索引后移
+        else if (wasCurrentPlayer && currentIndex >= turnOrder.Count)
+            currentIndex = 0;
+
+        // 4. 检查游戏结束
+        if (turnOrder.Count <= 1)
+        {
+            HandleGameOver();
+            return;
+        }
+
+        // 5. 若淘汰的是当前玩家，强制跳到下一位
+        if (wasCurrentPlayer)
+        {
+            StopAllCoroutines();
+            StartTurn();
+        }
+    }
+
+    private void HandleGameOver()
+    {
+        isGameActive = false;
+        string msg = turnOrder.Count == 1
+            ? $"游戏结束！玩家 {turnOrder[0].playerId} 获胜！"
+            : "游戏结束！";
+        UIManager.Instance.UpdateStatus($"<color=gold>{msg}</color>");
+        UIManager.Instance.HideActionButton();
+        UIManager.Instance.SetExtraButtonsVisible(false);
+        if (diceAnimator != null) diceAnimator.ShowDice(false);
+        Debug.Log($"<color=gold>[游戏结束] {msg}</color>");
     }
 }

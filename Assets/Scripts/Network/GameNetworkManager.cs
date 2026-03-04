@@ -134,7 +134,9 @@ public class GameNetworkManager : MonoBehaviour
     {
         yield return new WaitForSeconds(simulatedLatency);
         Debug.Log($"<color=yellow>[服务端] 玩家 {playerId} 金钱更新 {amount} ({reason})</color>");
-        GetPlayerById(playerId)?.ChangeMoney(amount);
+        PlayerController moneyTarget = GetPlayerById(playerId);
+        moneyTarget?.ChangeMoney(amount);
+        if (amount < 0) CheckAndHandleElimination(moneyTarget);
         onComplete?.Invoke();
     }
 
@@ -156,9 +158,15 @@ public class GameNetworkManager : MonoBehaviour
     private IEnumerator SimulateRentServer(int payerId, int ownerId, int rentAmount, Action onComplete)
     {
         yield return new WaitForSeconds(simulatedLatency);
-        Debug.Log($"<color=yellow>[服务端] 租金 ${rentAmount}：玩家 {payerId} → 玩家 {ownerId}</color>");
-        GetPlayerById(payerId)?.ChangeMoney(-rentAmount);
+
+        float taxRate = TurnManager.Instance != null ? TurnManager.Instance.currentTaxRate : 0f;
+        int tax = Mathf.RoundToInt(rentAmount * taxRate);
+
+        Debug.Log($"<color=yellow>[服务端] 租金 ${rentAmount}（+税 ${tax}）：玩家 {payerId} → 玩家 {ownerId}</color>");
+        PlayerController payer = GetPlayerById(payerId);
+        payer?.ChangeMoney(-(rentAmount + tax));
         GetPlayerById(ownerId)?.ChangeMoney(rentAmount);
+        CheckAndHandleElimination(payer);
         onComplete?.Invoke();
     }
 
@@ -202,12 +210,18 @@ public class GameNetworkManager : MonoBehaviour
         PlayerController player = GetPlayerById(playerId);
         GridNode node = GetGridNodeById(gridNodeId);
 
-        // 服务端权威校验：地块存在 + 无主 + 玩家钱够
-        if (player != null && node != null && node.owner == null && player.money >= price)
-        {
-            Debug.Log($"<color=yellow>[服务端] 玩家 {playerId} 购买地块 {gridNodeId} 成功</color>");
+        // 计算购地税
+        float taxRate = TurnManager.Instance != null ? TurnManager.Instance.currentTaxRate : 0f;
+        int tax = Mathf.RoundToInt(price * taxRate);
+        int totalCost = price + tax;
 
-            player.ChangeMoney(-price);
+        // 服务端权威校验：地块存在 + 无主 + 玩家钱够（含税）
+        if (player != null && node != null && node.owner == null && player.money >= totalCost)
+        {
+            Debug.Log($"<color=yellow>[服务端] 玩家 {playerId} 购买地块 {gridNodeId} 成功（地价 ${price} + 税 ${tax}）</color>");
+
+            player.ChangeMoney(-totalCost);
+            CheckAndHandleElimination(player); // 购地后资金恰好为 0 也触发淘汰
             node.owner = player;
 
             // 建筑落下动画（视觉逻辑保留在 GridEventManager）
@@ -308,6 +322,19 @@ public class GameNetworkManager : MonoBehaviour
     private GridNode GetGridNodeById(int gridNodeId)
     {
         return GameDataManager.Instance?.database?.GetGridById(gridNodeId);
+    }
+
+    //========================================
+    // 淘汰检查（每次扣钱后调用）
+    //========================================
+
+    /// <summary>若玩家资金 ≤ 0，钳制为 0 并触发淘汰。</summary>
+    private void CheckAndHandleElimination(PlayerController player)
+    {
+        if (player == null || player.money > 0) return;
+        player.money = 0;
+        UIManager.Instance?.UpdatePlayerStats(player);
+        TurnManager.Instance?.EliminatePlayer(player);
     }
 
     /// <summary>获取所有玩家（供外部系统查询）</summary>
