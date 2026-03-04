@@ -58,7 +58,12 @@ Assets/
 │   │       ├── BarricadeCard.cs     ← 路障卡（已实现）
 │   │       └── FreezeCard.cs        ← 冰冻卡（已实现）
 │   ├── MiniGames/
-│   │   └── MinigameController.cs    ← 小游戏场景返回主场景
+│   │   ├── MinigameController.cs    ← 小游戏场景返回主场景（旧测试用）
+│   │   └── BlockStack/
+│   │       ├── TetrisGameController.cs  ← 场景主控、状态机、名次结算、返回主场景
+│   │       ├── TetrisPlayerColumn.cs    ← 单玩家列区域（墙/地板/高度检测/spawn）
+│   │       ├── TetrisPiece.cs           ← 当前活动方块（输入控制+落地物理切换）
+│   │       └── TetrisNetworkSync.cs     ← 状态同步（Host 广播刚体状态，客户端插值）
 │   ├── TurnManager.cs               ← 回合管理（已整合网络请求层）
 │   ├── PlayerController.cs          ← 玩家移动、金钱、卡牌、冰冻状态
 │   ├── GridNode.cs                  ← 地块节点（类型/归属/路径连接）
@@ -149,18 +154,17 @@ TurnManager.StartTurn()
 - [x] 音频系统（BGM + SFX 分离）
 - [x] 编辑器工具（地块自动排布/路径连接/站位管理）
 - [x] 模拟联网中间层（GameNetworkManager，骰子请求/广播已拆分）
+- [x] 回合结束网络化（SendEndTurnRequest / ExecuteNetEndTurn）
+- [x] 税收系统（每 N 轮上涨 taxRateStep，UIManager 渐显通知）
+- [x] 玩家淘汰机制（资金 ≤ 0 → 清空房产 → 移出回合序列 → 检测游戏结束）
+- [x] 小游戏触发流程（每轮所有玩家行动完 → EnterMinigameFlow → 保存状态 → 切换场景）
 
 ---
 
 ## 待开发功能（按阶段优先级）
 
-### 当前重点：完善单机核心规则 + 模拟联网
+### 当前重点：Minigame_BlockStack 实现 + 特殊格子事件
 
-- [ ] **EndTurn 网络化**：`SendEndTurnRequest()` → 广播切换回合
-- [ ] **金钱/房产同步**：`SendMoneyChangeRequest()`、`SendBuyPropertyRequest()`
-- [ ] **税收系统**：`TurnCounter` 每 3 回合增加全局 `TaxMultiplier`（含 UI 滚动提示动效）
-- [ ] **伤害系统**：受伤扣 `资金 × 20%`（暂定，待测试）
-- [ ] **淘汰机制**：资金 ≤ 0 时触发淘汰，清空名下所有房产
 - [ ] **特殊格子事件**：
   - [ ] 银行：路过得钱
   - [ ] 医院：生命为 0 强制移动并停留一回合
@@ -195,24 +199,68 @@ TurnManager.StartTurn()
 | 拆除卡 | 铲除自己当前格房产 | ⬜ |
 | 磁铁卡 | 吸取范围内目标 20% 资金和道具（暂定，待测试） | ⬜ |
 
-### 第四阶段：小游戏 + 帧同步
+### 第四阶段：小游戏实现
 
+#### 场景命名约定
+
+小游戏场景统一命名为 `Minigame_[GameName]`，每个小游戏独立场景。`GameDataManager.SwitchToRandomMinigame()` 维护一个场景名列表随机选取。
+
+| 场景名 | 小游戏 | 状态 |
+|--------|--------|------|
+| `Minigame_BlockStack` | 物理方块竞速堆塔 | 设计完成，待实现 |
+| `Minigame_LianLianKan` | 连连看 | 规划中 |
+| `Minigame_FruitNinja` | 水果忍者 | 规划中 |
+| `Minigame_Runner` | 横板跑酷 | 规划中 |
+| `Minigame_Rhythm` | 节奏音游 | 规划中 |
+| `Minigame_BubbleHall` | 泡泡堂 | 规划中 |
+
+#### Minigame_BlockStack 设计规格
+
+**玩法**：最多6名玩家同时操控方块往自己的竖列里堆叠，最先堆到高度线的顺序决定本局名次，名次影响下一轮大地图的投骰顺序。
+
+**物理约束**（3D刚体，限制在2D平面）：
+```
+Rigidbody 约束:
+  Freeze Position: Z
+  Freeze Rotation: X, Y
+  允许: Position X/Y, Rotation Z（左右倾倒）
+```
+
+**场景布局**：
+- 6列并排，列宽5 unit，中心间距10 unit
+- X坐标：-25 / -15 / -5 / +5 / +15 / +25
+- 高度线 Y = 18，Spawn点 Y = 19（列顶中心）
+- 相机从 Z+ 正面看，位置约 Z=45，FOV=60°
+
+**方块**：标准7种Tetromino（I/O/T/S/Z/L/J），1×1×1 unit 单元，PhysicsMaterial（摩擦0.6/0.8，弹力0.05）
+
+**控制键位**（本地6玩家）：
+
+| 动作 | P1 | P2 | P3 | P4 | P5 | P6 |
+|------|----|----|----|----|----|----|
+| 左移 | A | ← | J | Num4 | G | - |
+| 右移 | D | → | L | Num6 | H | - |
+| 旋转 | W | ↑ | I | Num8 | Y | - |
+| 软落 | S | ↓ | K | Num5 | B | - |
+| 硬落 | Space | Enter | U | Num0 | N | - |
+
+**同步方案**：状态同步（Host 模拟物理，每 FixedUpdate 广播所有已落地刚体的 pos.x/y, rot.z, vel.x/y, angVel.z，其他客户端插值追赶）
+
+**结算**：完成顺序写入 `GameDataManager`，返回主场景后 `GameStartManager.ToTurnManagerFromLoad()` 按名次调用 `BeginGameFromMinigame(survivors)`
+
+**脚本职责**：
+
+| 脚本 | 职责 |
+|------|------|
+| `TetrisGameController` | 单例主控、游戏状态机（等待/游戏中/结算）、名次记录、倒计时、返回主场景 |
+| `TetrisPlayerColumn` | 单玩家列区域：边界碰撞体、高度检测、spawn 下一个方块、显示该玩家状态 |
+| `TetrisPiece` | 当前活动方块：接收输入、Kinematic 移动/旋转、落地后切换为物理 Rigidbody |
+| `TetrisNetworkSync` | 收集所有玩家输入、广播刚体状态（Host 端）/ 接收并插值（非 Host） |
+
+- [ ] 创建 `Minigame_BlockStack` 场景及 PlayerColumn Prefab（美术/场景搭建）
+- [ ] 实现 `TetrisGameController`、`TetrisPlayerColumn`、`TetrisPiece`、`TetrisNetworkSync`
+- [ ] 更新 `GameDataManager.SwitchToRandomMinigame()` 改为从列表随机选取场景名
 - [ ] Addressables 异步预加载（最后一名玩家行动时静默下载）
-- [ ] SceneLoader + 四人 Sync Point（全部就绪后统一开始）
-- [ ] Lockstep 帧同步控制器（66ms/帧收集输入 → 服务端广播 → 本地推算）
-- [ ] 小游戏结算 → 服务端下发排名 → 大地图奖励/下轮顺序
-
-小游戏列表（各自独立 Addressables Label，`Game_` 前缀）：
-
-| Label | 小游戏 |
-|-------|--------|
-| `Game_Tetris` | 俄罗斯方块 |
-| `Game_LianLianKan` | 连连看 |
-| `Game_FruitNinja` | 水果忍者 |
-| `Game_DoodleJump` | 涂鸦跳跳 |
-| `Game_Runner` | 横板跑酷 |
-| `Game_Rhythm` | 节奏音游 |
-| `Game_BubbleHall` | 泡泡堂 |
 
 ### 第五阶段：特殊 NPC
 
@@ -278,7 +326,7 @@ TurnManager.StartTurn()
 | 网络请求 | `Send` + 动作名 | `SendRollDiceRequest()` |
 | 网络广播回调 | `Execute` + Net + 动作名 | `ExecuteNetRollDice()` |
 | 状态查询 | `Is` / `Has` / `Get` 前缀 | `IsHandFull()`, `HasBarricade()` |
-| 小游戏 Label | `Game_` 前缀 | `Game_Tetris` |
+| 小游戏场景名 | `Minigame_` 前缀 | `Minigame_BlockStack` |
 | 消息协议 | `CMD_` 前缀全大写 | `CMD_ROLL`, `CMD_BUY` |
 
 ### 绝对不能动的东西
@@ -295,7 +343,9 @@ TurnManager.StartTurn()
 | 场景名 | 用途 |
 |--------|------|
 | `MainGameScene` | 主棋盘游戏场景 |
-| `MinigameScene` | 小游戏通用入口（按抽到的游戏动态加载对应 Label） |
+| `Minigame_[GameName]` | 小游戏命名约定，每个小游戏独立场景 |
+| `Minigame_BlockStack` | 物理方块竞速堆塔小游戏（第一个实现） |
+| `MinigameScene` | 旧测试场景，可保留测试用，后续删除 |
 
 ### 美术技术规范
 
@@ -320,17 +370,17 @@ TurnManager.StartTurn()
 
 ## 当前开发焦点
 
-**正在实现：模拟联网回合同步**
+**正在实现：Minigame_BlockStack 物理堆塔小游戏**
 
-核心文件：
-- `Assets/Scripts/Network/GameNetworkManager.cs`：模拟服务端，处理骰子/金钱/房产等请求和广播
-- `Assets/Scripts/TurnManager.cs`：已拆分为「发请求 `SendRollDiceRequest`」和「收广播执行 `ExecuteNetRollDice`」两个阶段
+大地图核心回合流程已完成（联网模拟层、税收、淘汰、小游戏触发均已实现）。
 
 **下一步（按顺序）**：
-1. `GameNetworkManager` 新增 `SendEndTurnRequest()` 方法
-2. `GridEventManager` 中金钱变动接入 `GameNetworkManager.SendMoneyChangeRequest()`
-3. 实现税收 `TaxMultiplier` 系统（`TurnManager` 内每 3 回合触发，含 UI 提示）
-4. 实现淘汰判断（`PlayerController.ChangeMoney` 检测资金 ≤ 0 时触发）
+1. 用户在 Unity 中创建 `Minigame_BlockStack` 场景 + PlayerColumn 预制体 + BlockUnit 预制体
+2. 实现 `TetrisPiece`（方块输入控制 + 落地物理切换）
+3. 实现 `TetrisPlayerColumn`（列管理 + 高度检测）
+4. 实现 `TetrisGameController`（游戏状态机 + 名次结算 + 返回主场景）
+5. 实现 `TetrisNetworkSync`（Host 物理广播 + 客户端插值）
+6. 更新 `GameDataManager.SwitchToRandomMinigame()` 改为加载 `Minigame_BlockStack`
 
 ---
 
