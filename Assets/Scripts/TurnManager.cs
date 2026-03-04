@@ -15,10 +15,6 @@ public class TurnManager : MonoBehaviour {
     [Tooltip("每隔几轮涨一次税")]
     public int taxRoundInterval = 3;
 
-    [Header("小游戏系统")]
-    [Tooltip("每隔几轮进入一次小游戏（0 = 禁用）")]
-    public int minigameRoundInterval = 3;
-
     public List<PlayerController> allPlayers => turnOrder;
 
     [HideInInspector] public float currentTaxRate = 0f;
@@ -186,19 +182,17 @@ public class TurnManager : MonoBehaviour {
         if (currentIndex == 0) {
             roundCount++;
 
-            // 税率检查
-            if (roundCount % taxRoundInterval == 0) {
+            // 税率检查（taxRoundInterval 若为 0 会抛异常，此处保护）
+            if (taxRoundInterval > 0 && roundCount % taxRoundInterval == 0) {
                 currentTaxRate += taxRateStep;
                 UIManager.Instance.ShowTaxNotification(
                     $"<color=red>税率上涨！当前税率：{currentTaxRate * 100:0}%</color>");
                 Debug.Log($"<color=orange>[税收] 第 {roundCount} 轮结束，税率升至 {currentTaxRate * 100:0}%</color>");
             }
 
-            // 小游戏触发
-            if (minigameRoundInterval > 0 && roundCount % minigameRoundInterval == 0) {
-                StartCoroutine(EnterMinigameFlow());
-                return; // 不进入下一回合，等待场景切换
-            }
+            // 每轮结束后进入小游戏
+            StartCoroutine(EnterMinigameFlow());
+            return;
         }
 
         StartTurn();
