@@ -11,5 +11,8 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/MinigameScene.unity
     guid: c39511e37324643649bbce202d403fdf
+  - enabled: 1
+    path: Assets/Scenes/Minigame_BlockStack.unity
+    guid: 09b4b50e6cfad4d36a42968388be24ed
   m_configObjects:
     com.unity.addressableassets: {fileID: 11400000, guid: b0dc4558c81fd47dbb7e9f8b8c0f59b4, type: 2}

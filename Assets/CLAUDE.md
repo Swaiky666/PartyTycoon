@@ -58,12 +58,12 @@ Assets/
 │   │       ├── BarricadeCard.cs     ← 路障卡（已实现）
 │   │       └── FreezeCard.cs        ← 冰冻卡（已实现）
 │   ├── MiniGames/
-│   │   ├── MinigameController.cs    ← 小游戏场景返回主场景（旧测试用）
-│   │   └── BlockStack/
-│   │       ├── TetrisGameController.cs  ← 场景主控、状态机、名次结算、返回主场景
-│   │       ├── TetrisPlayerColumn.cs    ← 单玩家列区域（墙/地板/高度检测/spawn）
-│   │       ├── TetrisPiece.cs           ← 当前活动方块（输入控制+落地物理切换）
-│   │       └── TetrisNetworkSync.cs     ← 状态同步（Host 广播刚体状态，客户端插值）
+│   │   └── MinigameController.cs    ← 小游戏场景返回主场景（旧测试用）
+│   ├── BlockStack/                  ← Minigame_BlockStack 专用脚本
+│   │   ├── TetrisGameController.cs  ← 场景主控、状态机、名次结算、返回主场景
+│   │   ├── TetrisPlayerColumn.cs    ← 单玩家列区域（墙/地板/高度检测/spawn）
+│   │   ├── TetrisPiece.cs           ← 当前活动方块（输入控制+落地物理切换）
+│   │   └── TetrisNetworkSync.cs     ← 状态同步（Host 广播刚体状态，客户端插值）
 │   ├── TurnManager.cs               ← 回合管理（已整合网络请求层）
 │   ├── PlayerController.cs          ← 玩家移动、金钱、卡牌、冰冻状态
 │   ├── GridNode.cs                  ← 地块节点（类型/归属/路径连接）
@@ -248,18 +248,194 @@ Rigidbody 约束:
 
 **结算**：完成顺序写入 `GameDataManager`，返回主场景后 `GameStartManager.ToTurnManagerFromLoad()` 按名次调用 `BeginGameFromMinigame(survivors)`
 
-**脚本职责**：
+**脚本详细设计**：
 
-| 脚本 | 职责 |
-|------|------|
-| `TetrisGameController` | 单例主控、游戏状态机（等待/游戏中/结算）、名次记录、倒计时、返回主场景 |
-| `TetrisPlayerColumn` | 单玩家列区域：边界碰撞体、高度检测、spawn 下一个方块、显示该玩家状态 |
-| `TetrisPiece` | 当前活动方块：接收输入、Kinematic 移动/旋转、落地后切换为物理 Rigidbody |
-| `TetrisNetworkSync` | 收集所有玩家输入、广播刚体状态（Host 端）/ 接收并插值（非 Host） |
+---
+
+##### `TetrisGameController.cs` — 场景主控单例
+
+```
+路径: Scripts/BlockStack/TetrisGameController.cs
+```
+
+关键字段：
+```csharp
+public static TetrisGameController Instance;
+public List<TetrisPlayerColumn> columns;   // Inspector 拖入6个列
+public float countdownDuration = 3f;       // 开始前倒计时
+public float gameTimeLimit = 180f;         // 总时限（秒），超时强制结算
+private List<int> finishOrder;             // 完成顺序，按 playerId 记录
+private enum GameState { Countdown, Playing, Finished }
+private GameState state;
+```
+
+关键方法：
+```csharp
+void StartCountdown()                         // 场景加载后调用，播放倒计时
+void StartGame()                              // 倒计时结束后，通知所有 Column 开始 Spawn
+public void OnPlayerFinished(int playerId)    // 由 TetrisPlayerColumn 在高度达标时回调
+void OnTimeUp()                               // 超时强制结算剩余名次
+void FinishGame()                             // 全员完成 or 超时 → 结算 → 延迟2秒返回
+void BackToMainGame()                         // 写入 GameDataManager → 加载 MainGameScene
+```
+
+结算逻辑：`finishOrder` 写入 `GameDataManager.savedMinigameRanking`（新增字段 `List<int>`），`GameStartManager.ToTurnManagerFromLoad()` 读取该列表作为 `BeginGameFromMinigame` 的玩家顺序。
+
+---
+
+##### `TetrisPlayerColumn.cs` — 单玩家列区域
+
+```
+路径: Scripts/BlockStack/TetrisPlayerColumn.cs
+```
+
+关键字段：
+```csharp
+public int playerId;                      // 对应大地图的 playerId
+public Transform spawnPoint;             // 新方块生成位置（列顶中心）
+public Transform finishLineTransform;    // 高度线位置（Y=18）
+public GameObject blockUnitPrefab;       // 1x1x1 单元预制体（无 Rigidbody）
+public TextMeshPro playerLabel;          // 显示玩家编号/状态
+private TetrisPiece currentPiece;        // 当前活动方块
+private List<Rigidbody> settledBlocks;   // 所有已落地刚体（供 NetworkSync 遍历）
+private bool isFinished;
+```
+
+关键方法：
+```csharp
+public void Init(int pid)                     // 设置 playerId，初始化 UI 标签
+public void SpawnNextPiece()                  // 随机选形状 → 实例化 TetrisPiece → 设置 currentPiece
+public void OnPieceSettled(TetrisPiece piece) // 接收 TetrisPiece 的落地回调 → 注册刚体 → 检测高度 → SpawnNextPiece
+private bool CheckFinishCondition()           // 遍历 settledBlocks，任意块 Y >= finishLineTransform.Y
+public void RegisterSettledBlock(Rigidbody rb)// 将落地刚体加入 settledBlocks 列表
+public List<Rigidbody> GetSettledBlocks()     // 供 TetrisNetworkSync 遍历广播
+```
+
+形状随机：`TetrominoType type = (TetrominoType)Random.Range(0, 7)`，传入 TetrisPiece.Init。
+
+---
+
+##### `TetrisPiece.cs` — 当前活动方块
+
+```
+路径: Scripts/BlockStack/TetrisPiece.cs
+```
+
+关键字段：
+```csharp
+public enum TetrominoType { I, O, T, S, Z, L, J }
+
+// 7种形状的子块偏移（相对于中心，XY平面）
+static readonly Dictionary<TetrominoType, Vector2Int[]> Shapes;
+
+public TetrisPlayerColumn ownerColumn;
+public int playerId;                      // 控制此方块的玩家
+public float fallSpeed = 2f;             // 自然下落速度（units/秒）
+public float softDropMultiplier = 5f;
+private List<Transform> blockUnits;      // 子块 Transform 列表
+private bool isSettled = false;
+private Rigidbody pieceRb;               // 整体 Kinematic Rigidbody（未落地时）
+```
+
+关键方法：
+```csharp
+public void Init(TetrominoType type, TetrisPlayerColumn column, int pid)
+    // 根据 Shapes[type] 实例化子块，定位到 spawnPoint，设为 Kinematic
+
+void Update()
+    // 自然下落：transform.position += Vector3.down * fallSpeed * Time.deltaTime
+    // 检测落地：任意子块触碰到其他 Collider → 调用 Settle()
+
+public void MoveLeft()   // transform.position += Vector3.left * 1f（整块移动）
+public void MoveRight()  // transform.position += Vector3.right * 1f
+public void RotateCW()   // transform.Rotate(0, 0, -90)（绕Z轴顺时针）
+public void SoftDrop()   // fallSpeed 临时 *= softDropMultiplier
+public void HardDrop()   // Raycast 向下找最低合法位置 → 瞬移 → Settle()
+
+void Settle()
+    // isSettled = true → 禁用整体 Rigidbody
+    // 遍历所有 blockUnits：Detach from parent → AddComponent<Rigidbody>()
+    //   → 设置 constraints(FreezePositionZ | FreezeRotationX | FreezeRotationY)
+    //   → ownerColumn.RegisterSettledBlock(rb)
+    // → ownerColumn.OnPieceSettled(this)
+```
+
+输入由 `TetrisNetworkSync` 轮询键盘后调用对应方法，`TetrisPiece` 本身不直接读取 Input。
+
+---
+
+##### `TetrisNetworkSync.cs` — 输入收集 + 物理状态同步
+
+```
+路径: Scripts/BlockStack/TetrisNetworkSync.cs
+```
+
+关键字段：
+```csharp
+public bool isHost = true;               // 模拟阶段默认 true（单机），联网后由房间角色决定
+public float syncInterval = 0.05f;       // 广播间隔（约 20Hz）
+private float syncTimer;
+
+// 各玩家的键位绑定
+static readonly KeyCode[][] KeyBindings = {
+    new[]{ KeyCode.A, KeyCode.D, KeyCode.W, KeyCode.S, KeyCode.Space },    // P1
+    new[]{ KeyCode.LeftArrow, KeyCode.RightArrow, KeyCode.UpArrow, KeyCode.DownArrow, KeyCode.Return }, // P2
+    new[]{ KeyCode.J, KeyCode.L, KeyCode.I, KeyCode.K, KeyCode.U },        // P3
+    new[]{ KeyCode.Keypad4, KeyCode.Keypad6, KeyCode.Keypad8, KeyCode.Keypad5, KeyCode.Keypad0 }, // P4
+    new[]{ KeyCode.G, KeyCode.H, KeyCode.Y, KeyCode.B, KeyCode.N },        // P5
+    // P6 暂缺（6人时需外接手柄或触屏）
+};
+// 顺序: [左, 右, 旋转CW, 软落, 硬落]
+```
+
+关键方法：
+```csharp
+void Update()
+    // 遍历 KeyBindings → 检测按键 → 调用对应 column.currentPiece 的方法
+
+void FixedUpdate()
+    // if (isHost && syncTimer >= syncInterval)
+    //   → 遍历所有 column.GetSettledBlocks()
+    //   → 收集 (instanceID, pos.x, pos.y, rot.z, vel.x, vel.y, angVel.z)
+    //   → BroadcastPhysicsState(data)（模拟阶段：空实现）
+
+public void ReceivePhysicsState(PhysicsStatePacket packet)
+    // 非 Host 客户端收到广播后：找到对应 Rigidbody → 插值位置/旋转
+
+[System.Serializable]
+public struct PhysicsStatePacket {
+    public int blockInstanceId;
+    public float posX, posY, rotZ;
+    public float velX, velY, angVelZ;
+}
+```
+
+**`GameDataManager` 需新增字段**：
+```csharp
+[Header("小游戏结算")]
+public List<int> minigameRanking = new List<int>(); // 按名次存 playerId，由 TetrisGameController.BackToMainGame() 写入
+public List<string> minigameScenes = new List<string> { "Minigame_BlockStack" }; // SwitchToRandomMinigame 从此列表随机
+```
+
+**`SwitchToRandomMinigame()` 修改**：
+```csharp
+// 改为从 minigameScenes 随机选取，而不是硬编码 "MinigameScene"
+string scene = minigameScenes[Random.Range(0, minigameScenes.Count)];
+SceneManager.LoadScene(scene);
+```
+
+**`GameStartManager.ToTurnManagerFromLoad()` 读取排名**：
+```csharp
+// 若 minigameRanking 不为空，按排名顺序重排 survivors 列表
+if (GameDataManager.Instance.minigameRanking.Count > 0)
+    survivors = survivors.OrderBy(p => GameDataManager.Instance.minigameRanking.IndexOf(p.playerId)).ToList();
+GameDataManager.Instance.minigameRanking.Clear();
+```
 
 - [ ] 创建 `Minigame_BlockStack` 场景及 PlayerColumn Prefab（美术/场景搭建）
 - [ ] 实现 `TetrisGameController`、`TetrisPlayerColumn`、`TetrisPiece`、`TetrisNetworkSync`
-- [ ] 更新 `GameDataManager.SwitchToRandomMinigame()` 改为从列表随机选取场景名
+- [ ] 更新 `GameDataManager`（新增字段 + 修改 `SwitchToRandomMinigame`）
+- [ ] 更新 `GameStartManager.ToTurnManagerFromLoad()` 读取 `minigameRanking`
 - [ ] Addressables 异步预加载（最后一名玩家行动时静默下载）
 
 ### 第五阶段：特殊 NPC

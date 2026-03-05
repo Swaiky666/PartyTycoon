@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(curl -s https://raw.githubusercontent.com/R-zine/stackr/main/src/Game.jsx)",
+      "Bash(curl -s https://raw.githubusercontent.com/R-zine/stackr/main/src/Cube.jsx)",
+      "Bash(curl -s https://raw.githubusercontent.com/R-zine/stackr/main/src/Floor.jsx)",
+      "Bash(curl -s https://raw.githubusercontent.com/R-zine/stackr/main/src/App.jsx)",
+      "Bash(curl -s https://raw.githubusercontent.com/R-zine/stackr/main/package.json)",
+      "Read(//private/tmp/TrickyTower/**)",
+      "Read(//tmp/TrickyTower/**)"
+    ]
+  }
+}

@@ -45,7 +45,13 @@ public class GameDataManager : MonoBehaviour {
     public GameObject prisonPrefab;       
 
     [Header("动画配置")]
-    public float dropHeight = 15f; 
+    public float dropHeight = 15f;
+
+    [Header("小游戏结算")]
+    [Tooltip("小游戏完成名次（按顺序存 playerId），由 TetrisGameController 写入")]
+    public List<int> minigameRanking = new List<int>();
+    [Tooltip("可随机选取的小游戏场景名列表")]
+    public List<string> minigameScenes = new List<string>() { "Minigame_BlockStack" };
 
     void Awake() {
         if (Instance == null) {
@@ -154,6 +160,9 @@ public class GameDataManager : MonoBehaviour {
 
     public void SwitchToRandomMinigame(List<PlayerController> currentPlayers) {
         SaveGameState(currentPlayers);
-        SceneManager.LoadScene("MinigameScene"); 
+        string scene = (minigameScenes != null && minigameScenes.Count > 0)
+            ? minigameScenes[Random.Range(0, minigameScenes.Count)]
+            : "Minigame_BlockStack";
+        SceneManager.LoadScene(scene);
     }
 }

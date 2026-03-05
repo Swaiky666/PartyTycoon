@@ -128,10 +128,20 @@ public class GameStartManager : MonoBehaviour {
         gameObject.SetActive(false);
     }
 
-    // 从小游戏返回时直接进入回合，不需要掷骰决定顺序
+    // 从小游戏返回时直接进入回合，按小游戏名次重排顺序
     void ToTurnManagerFromLoad() {
-        // 过滤掉已淘汰玩家（存档里没有记录的视为已淘汰，LoadGameState 不会恢复他们，currentGrid 为 null）
         List<PlayerController> survivors = players.FindAll(p => p.currentGrid != null);
+
+        // 若小游戏写入了排名，按名次顺序重排（名次靠前 = 先走）
+        var ranking = GameDataManager.Instance?.minigameRanking;
+        if (ranking != null && ranking.Count > 0) {
+            survivors = survivors.OrderBy(p => {
+                int idx = ranking.IndexOf(p.playerId);
+                return idx < 0 ? int.MaxValue : idx;
+            }).ToList();
+            GameDataManager.Instance.minigameRanking.Clear();
+        }
+
         TurnManager.Instance.BeginGameFromMinigame(survivors);
         gameObject.SetActive(false);
     }
