@@ -28,6 +28,8 @@ public class TetrisPiece : MonoBehaviour
     const float PhysicsSettleSpeed = 0.2f;
     const float PhysicsSettleTime  = 0.25f;
     const float PhysicsMaxTime     = 4f;   // 超过此秒数强制固化，防止方块永远不落定
+    // 掉出地图判定：世界 Y 低于此值时销毁并补生
+    const float KillY             = -1.5f;
 
     [HideInInspector] public TetrisPlayerColumn ownerColumn;
     [HideInInspector] public int playerId;
@@ -42,13 +44,18 @@ public class TetrisPiece : MonoBehaviour
     private float     physicsSettleTimer = 0f;
     private float     physicsElapsed    = 0f;
 
+    // Ghost piece (drop indicator)
+    private Color            _playerColor;
+    private List<GameObject> _ghostUnits = new List<GameObject>();
+
     // ── 初始化 ───────────────────────────────────────────────────────────────
 
     public void Init(TetrominoType type, TetrisPlayerColumn column, int pid,
                      GameObject blockPrefab, Color color)
     {
-        ownerColumn = column;
-        playerId    = pid;
+        ownerColumn  = column;
+        playerId     = pid;
+        _playerColor = color;
 
         foreach (var offset in Shapes[type])
         {
@@ -75,6 +82,8 @@ public class TetrisPiece : MonoBehaviour
             blockUnits.Add(block.transform);
             myColliders.AddRange(block.GetComponentsInChildren<Collider>());
         }
+
+        CreateGhostUnits(blockPrefab, color);
     }
 
     // ── 帧更新：代码控制下落 ─────────────────────────────────────────────────
@@ -82,6 +91,12 @@ public class TetrisPiece : MonoBehaviour
     void Update()
     {
         if (isSettled || isPhysicsFalling) return;
+
+        // 掉出地图判定（代码控制阶段）
+        foreach (var block in blockUnits)
+        {
+            if (block != null && block.position.y < KillY) { KillPiece(); return; }
+        }
 
         if (ownerColumn != null && ownerColumn.softDropHeld)
             isSoftDropping = true;
@@ -102,6 +117,7 @@ public class TetrisPiece : MonoBehaviour
         }
 
         isSoftDropping = false;
+        UpdateGhost();
     }
 
     // ── 物理帧：监测 rb 落定后固化 ──────────────────────────────────────────
@@ -109,6 +125,9 @@ public class TetrisPiece : MonoBehaviour
     void FixedUpdate()
     {
         if (!isPhysicsFalling || isSettled || pieceRb == null) return;
+
+        // 掉出地图判定（物理阶段）
+        if (pieceRb.position.y < KillY) { KillPiece(); return; }
 
         float dt = Time.fixedDeltaTime;
         physicsElapsed += dt;
@@ -143,6 +162,7 @@ public class TetrisPiece : MonoBehaviour
     {
         if (isPhysicsFalling) return;
         isPhysicsFalling = true;
+        DestroyGhost();
 
         pieceRb = gameObject.AddComponent<Rigidbody>();
         pieceRb.mass                   = 0.5f;
@@ -155,25 +175,40 @@ public class TetrisPiece : MonoBehaviour
                                        | RigidbodyConstraints.FreezeRotationZ;
     }
 
+    // 确保在任何销毁路径（包括外部 Destroy）下都清理 ghost
+    void OnDestroy() { DestroyGhost(); }
+
+    // 掉出地图：通知列重新生成，然后销毁自身
+    void KillPiece()
+    {
+        if (isSettled) return;
+        isSettled = true; // 复用标志防止重复处理
+        DestroyGhost();
+        ownerColumn?.OnPieceKilled();
+        Destroy(gameObject);
+    }
+
     // ── 外部输入接口（由 TetrisNetworkSync 调用）────────────────────────────
 
     public void MoveLeft()
     {
         if (isSettled || isPhysicsFalling) return;
-        if (!WouldOverlap(Vector3.left)) transform.position += Vector3.left;
+        if (!WouldOverlap(Vector3.left) && !WouldExceedBounds(Vector3.left))
+            transform.position += Vector3.left;
     }
 
     public void MoveRight()
     {
         if (isSettled || isPhysicsFalling) return;
-        if (!WouldOverlap(Vector3.right)) transform.position += Vector3.right;
+        if (!WouldOverlap(Vector3.right) && !WouldExceedBounds(Vector3.right))
+            transform.position += Vector3.right;
     }
 
     public void RotateCW()
     {
         if (isSettled || isPhysicsFalling) return;
         transform.Rotate(0f, 0f, -90f);
-        if (WouldOverlapCurrent()) transform.Rotate(0f, 0f, 90f);
+        if (WouldOverlapCurrent() || WouldExceedBoundsCurrent()) transform.Rotate(0f, 0f, 90f);
     }
 
     public void SetSoftDrop(bool active) { isSoftDropping = active; }
@@ -203,6 +238,31 @@ public class TetrisPiece : MonoBehaviour
         return false;
     }
 
+    // 检测移动 offset 后是否超出所属列边界
+    bool WouldExceedBounds(Vector3 offset)
+    {
+        if (ownerColumn == null) return false;
+        float halfW   = ownerColumn.columnHalfWidth + 1.5f; // 方块中心允许超出地基 2 格
+        float centerX = ownerColumn.transform.position.x;
+        foreach (var block in blockUnits)
+        {
+            float nx = block.position.x + offset.x;
+            if (nx < centerX - halfW || nx > centerX + halfW) return true;
+        }
+        return false;
+    }
+
+    // 检测当前位置是否超出边界（用于旋转后验证）
+    bool WouldExceedBoundsCurrent()
+    {
+        if (ownerColumn == null) return false;
+        float halfW   = ownerColumn.columnHalfWidth + 1.5f;
+        float centerX = ownerColumn.transform.position.x;
+        foreach (var block in blockUnits)
+            if (block.position.x < centerX - halfW || block.position.x > centerX + halfW) return true;
+        return false;
+    }
+
     // 检测当前位置（用于旋转后验证）
     bool WouldOverlapCurrent()
     {
@@ -223,6 +283,7 @@ public class TetrisPiece : MonoBehaviour
     {
         if (isSettled) return;
         isSettled = true;
+        DestroyGhost();
 
         var mat = new PhysicMaterial("Settled")
         {
@@ -278,42 +339,137 @@ public class TetrisPiece : MonoBehaviour
 
         // 6. 新固化块：缓冲 3 帧后转为动态，避免与下方块初始穿透
         SettledBlockMonitor monitor = root.AddComponent<SettledBlockMonitor>();
-        monitor.Trigger(rb);
+        monitor.Trigger(rb, () => ownerColumn?.OnBlockSnapped());
 
         ownerColumn.OnPieceSettled(this);
         Destroy(gameObject); // 销毁 piece 根（子块已转移到 root，不受影响）
     }
 
-    // 按行（Y 四舍五入）把同行子块合并为一个 BoxCollider，加到 root 上
+    // ── Ghost piece（下坠落点预览）────────────────────────────────────────────
+
+    void CreateGhostUnits(GameObject prefab, Color color)
+    {
+        Color ghostColor = new Color(color.r, color.g, color.b, 0.28f);
+        foreach (var block in blockUnits)
+        {
+            GameObject ghost = Instantiate(prefab);
+            ghost.name = "GhostUnit";
+
+            // 去除所有碰撞体，不影响物理
+            foreach (var col in ghost.GetComponentsInChildren<Collider>())
+                Destroy(col);
+
+            // 半透明材质
+            Renderer rend = ghost.GetComponentInChildren<Renderer>();
+            if (rend != null)
+            {
+                Material mat = new Material(rend.material);
+                SetMaterialTransparent(mat);
+                mat.color = ghostColor;
+                rend.material = mat;
+            }
+
+            // Outline 用玩家颜色
+            GameObject rendGo = rend != null ? rend.gameObject : ghost;
+            Outline ol = rendGo.GetComponent<Outline>() ?? rendGo.AddComponent<Outline>();
+            ol.OutlineMode  = Outline.Mode.OutlineAll;
+            ol.OutlineColor = new Color(color.r, color.g, color.b, 0.85f);
+            ol.OutlineWidth = 4f;
+
+            _ghostUnits.Add(ghost);
+        }
+    }
+
+    float CalcDropDistance()
+    {
+        float minDrop = 200f;
+        foreach (var block in blockUnits)
+        {
+            if (block == null) continue;
+            if (Physics.BoxCast(block.position, Vector3.one * 0.45f, Vector3.down,
+                                out RaycastHit hit, block.rotation, 200f,
+                                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            {
+                if (!myColliders.Contains(hit.collider))
+                    minDrop = Mathf.Min(minDrop, hit.distance);
+            }
+        }
+        return minDrop < 200f ? minDrop : 0f;
+    }
+
+    void UpdateGhost()
+    {
+        float drop = CalcDropDistance();
+        for (int i = 0; i < blockUnits.Count && i < _ghostUnits.Count; i++)
+        {
+            if (blockUnits[i] == null || _ghostUnits[i] == null) continue;
+            _ghostUnits[i].transform.position = blockUnits[i].position + Vector3.down * drop;
+            _ghostUnits[i].transform.rotation = blockUnits[i].rotation;
+        }
+    }
+
+    void DestroyGhost()
+    {
+        foreach (var g in _ghostUnits) if (g != null) Destroy(g);
+        _ghostUnits.Clear();
+    }
+
+    static void SetMaterialTransparent(Material mat)
+    {
+        if (mat.HasProperty("_Mode"))
+        {
+            mat.SetFloat("_Mode", 2);
+            mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            mat.SetInt("_ZWrite", 0);
+            mat.DisableKeyword("_ALPHATEST_ON");
+            mat.EnableKeyword("_ALPHABLEND_ON");
+            mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+            mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+        }
+        if (mat.HasProperty("_Surface"))
+        {
+            mat.SetFloat("_Surface", 1);
+            mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            mat.SetInt("_ZWrite", 0);
+            mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+        }
+    }
+
+    // 按行（Y 四舍五入）把同行子块按连续段分别建 BoxCollider，保留中间空格
     // root 坐标系 = 世界坐标系（root 在原点），所以 center 直接用世界坐标
     static void AddRowColliders(GameObject root, List<Transform> blocks, PhysicMaterial mat)
     {
-        var rows = new Dictionary<int, Vector4>(); // key=rowY, value=(minX, maxX, sumY, count)
+        // 收集每行所有 X 坐标
+        var rows = new Dictionary<int, List<float>>();
         foreach (var b in blocks)
         {
             int key = Mathf.RoundToInt(b.position.y);
-            if (!rows.ContainsKey(key))
-                rows[key] = new Vector4(b.position.x, b.position.x, b.position.y, 1);
-            else
-            {
-                Vector4 r = rows[key];
-                rows[key] = new Vector4(
-                    Mathf.Min(r.x, b.position.x),
-                    Mathf.Max(r.y, b.position.x),
-                    r.z + b.position.y,
-                    r.w + 1);
-            }
+            if (!rows.ContainsKey(key)) rows[key] = new List<float>();
+            rows[key].Add(b.position.x);
         }
+
         foreach (var kv in rows)
         {
-            Vector4 r  = kv.Value;
-            float centerX = (r.x + r.y) * 0.5f;
-            float centerY = r.z / r.w;           // 行内平均 Y
-            float width   = r.y - r.x + 1f;
-            BoxCollider bc   = root.AddComponent<BoxCollider>();
-            bc.center         = new Vector3(centerX, centerY, 0f);
-            bc.size           = new Vector3(width, 1f, 1f);
-            bc.sharedMaterial = mat;
+            var xs = kv.Value;
+            xs.Sort();
+
+            // 按连续段（相邻 X 间距 > 1.5 即断开）分别建碰撞体
+            int segStart = 0;
+            for (int i = 1; i <= xs.Count; i++)
+            {
+                bool isEnd = (i == xs.Count) || (xs[i] - xs[i - 1] > 1.5f);
+                if (!isEnd) continue;
+
+                float minX = xs[segStart], maxX = xs[i - 1];
+                BoxCollider bc = root.AddComponent<BoxCollider>();
+                bc.center         = new Vector3((minX + maxX) * 0.5f, kv.Key, 0f);
+                bc.size           = new Vector3(maxX - minX + 1f, 1f, 1f);
+                bc.sharedMaterial = mat;
+                segStart = i;
+            }
         }
     }
 }

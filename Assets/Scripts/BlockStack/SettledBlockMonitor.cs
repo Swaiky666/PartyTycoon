@@ -1,4 +1,5 @@
 using UnityEngine;
+using DG.Tweening;
 
 /// <summary>
 /// 附在已固化方块的 Rigidbody 上。
@@ -15,24 +16,43 @@ public class SettledBlockMonitor : MonoBehaviour
     const float MaxAcceleration = 15f;
 
     // ── 吸附参数 ─────────────────────────────────────────────────────────────
-    const float SnapPosEnter   = 0.15f;  // 位置偏离整数格 < 此值时可进入吸附
-    const float SnapRotEnter   = 8f;     // 旋转偏离最近 90° < 此度时可进入吸附
-    const float SnapSpeedEnter = 0.5f;   // 速度 < 此值时才允许进入吸附
+    const float SnapPosEnter   = 0.07f;  // 位置偏离整数格 < 此值时可进入吸附
+    const float SnapRotEnter   = 3f;     // 旋转偏离最近 90° < 此度时可进入吸附
+    const float SnapSpeedEnter = 0.12f;  // 速度 < 此值时才允许进入吸附（必须接近静止）
     const float UnsnapPos      = 0.38f;  // 位置偏离 > 此值时取消吸附
-    const float SnapForce      = 12f;    // 吸附加速度（m/s²）
-    const float SnapTorque     = 60f;    // 旋转吸附加速度（deg/s²）
+    const float SnapForce      = 28f;    // 吸附加速度（m/s²，保持强力）
+    const float SnapTorque     = 120f;   // 旋转吸附加速度（deg/s²，保持强力）
 
-    Rigidbody _rb;
-    Vector3   _prevVelocity;
+    Rigidbody      _rb;
+    Vector3        _prevVelocity;
+    Transform[]    _visualTransforms;
+    System.Action  _onSnapped;
 
     public bool IsSnapped { get; private set; }
 
-    public void Trigger(Rigidbody rb)
+    public void Trigger(Rigidbody rb, System.Action onSnapped = null)
     {
         _rb           = rb;
         _prevVelocity = rb != null ? rb.velocity : Vector3.zero;
+        _onSnapped    = onSnapped;
         IsSnapped     = false;
         enabled       = true;
+
+        // 收集直接子物体（block unit），而非所有 Renderer 后代。
+        // GetComponentsInChildren 会同时拿到 Outline 包内部的二级 Renderer，
+        // 导致父子同时被独立 DOPunchScale → 倍乘缩放 → 视觉分裂。
+        // 只动画直接子层，Outline 子网格会随父自然跟随，不产生分裂效果。
+        if (rb != null)
+        {
+            var children = new System.Collections.Generic.List<Transform>();
+            foreach (Transform child in rb.transform)
+                children.Add(child);
+            _visualTransforms = children.ToArray();
+        }
+        else
+        {
+            _visualTransforms = new Transform[0];
+        }
     }
 
     void FixedUpdate()
@@ -112,7 +132,23 @@ public class SettledBlockMonitor : MonoBehaviour
                 _rb.rotation        = Quaternion.Euler(0f, 0f, targetZ);
                 _rb.velocity        = Vector3.zero;
                 _rb.angularVelocity = Vector3.zero;
+
+                PlaySnapAnim();
+                _onSnapped?.Invoke();
             }
+        }
+    }
+
+    // 吸附时视觉缩放脉冲（仅视觉，不影响碰撞体）
+    void PlaySnapAnim()
+    {
+        if (_visualTransforms == null) return;
+        foreach (var t in _visualTransforms)
+        {
+            if (t == null) continue;
+            t.DOKill();
+            t.localScale = Vector3.one;
+            t.DOPunchScale(Vector3.one * 0.18f, 0.28f, 6, 0.4f);
         }
     }
 }

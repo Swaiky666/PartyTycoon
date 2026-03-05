@@ -5,6 +5,7 @@ using TMPro;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
+using DG.Tweening;
 
 public class TetrisGameController : MonoBehaviour
 {
@@ -22,10 +23,14 @@ public class TetrisGameController : MonoBehaviour
     public TextMeshProUGUI rankingText;
     [Header("游戏配置")]
     public float countdownDuration = 3f;
-    public float gameTimeLimit     = 60f;     // 游戏时限（秒）
+    public float gameTimeLimit     = 200f;    // 游戏时限（秒）
+
+    [Header("大风配置")]
+    public float windInterval = 30f;   // 大风间隔（秒）
+    public float windForce    = 12f;   // 横向冲量大小
 
     [Header("列布局")]
-    public float columnSpacing  = 15f;        // 列中心间距
+    public float columnSpacing  = 16f;        // 列中心间距
     public float columnWidth    = 5f;         // 列宽（单位）
     public float finishLineY    = 18f;        // 完成高度线
     public float spawnY         = 19f;        // 方块生成 Y
@@ -47,6 +52,7 @@ public class TetrisGameController : MonoBehaviour
 
     private List<int> finishOrder = new List<int>();
     private float     gameTimer   = 0f;
+    private float     windTimer   = 0f;
     private bool      isPlaying   = false;
     private int       activePlayers;
 
@@ -86,7 +92,34 @@ public class TetrisGameController : MonoBehaviour
         if (countdownText != null)
             countdownText.text = Mathf.CeilToInt(gameTimeLimit - gameTimer).ToString();
 
+        // 大风计时
+        windTimer += Time.deltaTime;
+        if (windTimer >= windInterval)
+        {
+            windTimer = 0f;
+            TriggerWind();
+        }
+
         UpdateLiveRanking();
+    }
+
+    // ── 大风 ─────────────────────────────────────────────────────────────────
+
+    void TriggerWind()
+    {
+        if (statusText != null) statusText.text = "大风来袭！！";
+        StartCoroutine(ClearWindStatus());
+
+        // 随机选一个横向方向，所有列同向
+        float dir = Random.value > 0.5f ? 1f : -1f;
+        foreach (var col in columns)
+            col.ApplyWind(dir * windForce);
+    }
+
+    IEnumerator ClearWindStatus()
+    {
+        yield return new WaitForSeconds(2f);
+        if (isPlaying && statusText != null) statusText.text = "把方块堆到红线！";
     }
 
     // ── 程序化生成所有列 ──────────────────────────────────────────────────────
@@ -132,6 +165,11 @@ public class TetrisGameController : MonoBehaviour
             {
                 rend.material = new Material(rend.sharedMaterial);
                 rend.material.color = new Color(0.25f, 0.25f, 0.25f);
+
+                Outline ol = rend.gameObject.AddComponent<Outline>();
+                ol.OutlineMode  = Outline.Mode.OutlineAll;
+                ol.OutlineColor = new Color(0.8f, 0.88f, 1f);
+                ol.OutlineWidth = 4f;
             }
             // 地基不需要 Rigidbody，BoxCollider 保留作为静态地板
         }
@@ -157,6 +195,8 @@ public class TetrisGameController : MonoBehaviour
 
         // ── 初始化 Column ─────────────────────────────────────────────────────
         column.Init(pid, color, blockUnitPrefab);
+        column.rowWidth        = Mathf.RoundToInt(columnWidth);
+        column.columnHalfWidth = columnWidth / 2f;
 
         return column;
     }
@@ -332,27 +372,13 @@ public class TetrisGameController : MonoBehaviour
         finishOrder.Add(playerId);
         Debug.Log($"[BlockStack] 玩家 {playerId} 完成！名次: {finishOrder.Count}");
         UpdateRankingUI();
-        if (finishOrder.Count >= activePlayers) FinishGame();
+        FinishGame(); // 第一个到达终点即触发结束
     }
 
     // ── 超时 ─────────────────────────────────────────────────────────────────
 
     void OnTimeUp()
     {
-        if (!isPlaying) return;
-
-        // 未完成的列按当前高度降序排列后追加进 finishOrder
-        var unfinished = new List<TetrisPlayerColumn>();
-        foreach (var col in columns)
-            if (!col.IsFinished()) unfinished.Add(col);
-
-        unfinished.Sort((a, b) => b.GetCurrentMaxHeight().CompareTo(a.GetCurrentMaxHeight()));
-
-        foreach (var col in unfinished)
-        {
-            if (!finishOrder.Contains(col.playerId)) finishOrder.Add(col.playerId);
-        }
-
         FinishGame();
     }
 
@@ -360,13 +386,26 @@ public class TetrisGameController : MonoBehaviour
 
     void FinishGame()
     {
+        if (!isPlaying) return;
         isPlaying = false;
+
+        // 未完成的列按当前高度降序排列后追加进 finishOrder
+        var unfinished = new List<TetrisPlayerColumn>();
+        foreach (var col in columns)
+            if (!col.IsFinished()) unfinished.Add(col);
+        unfinished.Sort((a, b) => b.GetCurrentMaxHeight().CompareTo(a.GetCurrentMaxHeight()));
+        foreach (var col in unfinished)
+            if (!finishOrder.Contains(col.playerId)) finishOrder.Add(col.playerId);
         if (statusText != null) statusText.text = "游戏结束！";
+        int winnerId = finishOrder.Count > 0 ? finishOrder[0] : -1;
         foreach (var col in columns)
         {
             col.Stop();
-            col.ReleaseBlocks(); // 统一释放为 Rigidbody，触发倒塌动画
+            if (col.playerId == winnerId)
+                col.PlayVictoryAnim(); // 只有胜利玩家才触发特效
         }
+        // 全局摄像机震动（兜底：当各列未设置独立摄像机时）
+        Camera.main?.DOShakePosition(0.65f, new Vector3(0.2f, 0.12f, 0f), 22, 70f, false);
 
         TetrisNetworkSync sync = GetComponent<TetrisNetworkSync>();
         if (sync != null) sync.enabled = false;

@@ -207,236 +207,66 @@ TurnManager.StartTurn()
 
 | 场景名 | 小游戏 | 状态 |
 |--------|--------|------|
-| `Minigame_BlockStack` | 物理方块竞速堆塔 | 设计完成，待实现 |
+| `Minigame_BlockStack` | 物理方块竞速堆塔 | ✅ 已实现 |
 | `Minigame_LianLianKan` | 连连看 | 规划中 |
 | `Minigame_FruitNinja` | 水果忍者 | 规划中 |
 | `Minigame_Runner` | 横板跑酷 | 规划中 |
 | `Minigame_Rhythm` | 节奏音游 | 规划中 |
 | `Minigame_BubbleHall` | 泡泡堂 | 规划中 |
 
-#### Minigame_BlockStack 设计规格
+#### Minigame_BlockStack 实现现状（✅ 已完成）
 
-**玩法**：最多6名玩家同时操控方块往自己的竖列里堆叠，最先堆到高度线的顺序决定本局名次，名次影响下一轮大地图的投骰顺序。
+**玩法**：最多6名玩家同时操控方块往自己的竖列里堆叠，**第一个**堆到高度线的玩家获胜，游戏立即结束，未完成玩家按当前最高方块高度排名。
 
-**物理约束**（3D刚体，限制在2D平面）：
+**实际场景布局**：
+- 6列程序化生成，列宽5 unit，中心间距 **16** unit
+- 高度线 Y = 18 × 1.5 = **27**，Spawn点 Y = 28
+- 所有列由 `TetrisGameController.BuildColumn()` 运行时创建，无需 Inspector 手动配置
+
+**物理系统**：
+- 活动方块：代码控制下落（Kinematic），接近碰撞时切换为物理 Rigidbody（混合模式）
+- 落地方块：compound Rigidbody，行内合并 BoxCollider，`SettledBlockMonitor` 负责吸附 + 加速度限制
+- 消行成钢铁地基：整行连续吸附后转为无 Rigidbody 静态碰撞体（`FormSteelBase`）
+- 大风系统：每 30s 触发，将已落地方块拆散为独立 WindBlock 并吹走，当前下坠方块被摧毁
+
+**吸附参数（SettledBlockMonitor.cs）**：
 ```
-Rigidbody 约束:
-  Freeze Position: Z
-  Freeze Rotation: X, Y
-  允许: Position X/Y, Rotation Z（左右倾倒）
-```
-
-**场景布局**：
-- 6列并排，列宽5 unit，中心间距10 unit
-- X坐标：-25 / -15 / -5 / +5 / +15 / +25
-- 高度线 Y = 18，Spawn点 Y = 19（列顶中心）
-- 相机从 Z+ 正面看，位置约 Z=45，FOV=60°
-
-**方块**：标准7种Tetromino（I/O/T/S/Z/L/J），1×1×1 unit 单元，PhysicsMaterial（摩擦0.6/0.8，弹力0.05）
-
-**控制键位**（本地6玩家）：
-
-| 动作 | P1 | P2 | P3 | P4 | P5 | P6 |
-|------|----|----|----|----|----|----|
-| 左移 | A | ← | J | Num4 | G | - |
-| 右移 | D | → | L | Num6 | H | - |
-| 旋转 | W | ↑ | I | Num8 | Y | - |
-| 软落 | S | ↓ | K | Num5 | B | - |
-| 硬落 | Space | Enter | U | Num0 | N | - |
-
-**同步方案**：状态同步（Host 模拟物理，每 FixedUpdate 广播所有已落地刚体的 pos.x/y, rot.z, vel.x/y, angVel.z，其他客户端插值追赶）
-
-**结算**：完成顺序写入 `GameDataManager`，返回主场景后 `GameStartManager.ToTurnManagerFromLoad()` 按名次调用 `BeginGameFromMinigame(survivors)`
-
-**脚本详细设计**：
-
----
-
-##### `TetrisGameController.cs` — 场景主控单例
-
-```
-路径: Scripts/BlockStack/TetrisGameController.cs
+SnapPosEnter   = 0.07f   // 进入吸附的位置阈值
+SnapRotEnter   = 3f      // 进入吸附的旋转阈值（度）
+SnapSpeedEnter = 0.12f   // 进入吸附的速度阈值
+UnsnapPos      = 0.38f   // 脱出吸附的位置偏离量
+SnapForce      = 28f     // 位置吸附加速度
+SnapTorque     = 120f    // 旋转吸附加速度
 ```
 
-关键字段：
-```csharp
-public static TetrisGameController Instance;
-public List<TetrisPlayerColumn> columns;   // Inspector 拖入6个列
-public float countdownDuration = 3f;       // 开始前倒计时
-public float gameTimeLimit = 180f;         // 总时限（秒），超时强制结算
-private List<int> finishOrder;             // 完成顺序，按 playerId 记录
-private enum GameState { Countdown, Playing, Finished }
-private GameState state;
-```
+**移动边界**：方块中心允许超出地基 ±2 格（`columnHalfWidth + 1.5f`），旋转验证与移动使用相同公式。
 
-关键方法：
-```csharp
-void StartCountdown()                         // 场景加载后调用，播放倒计时
-void StartGame()                              // 倒计时结束后，通知所有 Column 开始 Spawn
-public void OnPlayerFinished(int playerId)    // 由 TetrisPlayerColumn 在高度达标时回调
-void OnTimeUp()                               // 超时强制结算剩余名次
-void FinishGame()                             // 全员完成 or 超时 → 结算 → 延迟2秒返回
-void BackToMainGame()                         // 写入 GameDataManager → 加载 MainGameScene
-```
+**胜利动画**（仅第一名玩家触发）：
+- 所有已落定方块（含未吸附）立即冻结（isKinematic = true）
+- 材质渐变为玩家颜色，Outline 变金色并加粗 1.5×
+- DOPunchScale 脉冲放大，摄像机震动
 
-结算逻辑：`finishOrder` 写入 `GameDataManager.savedMinigameRanking`（新增字段 `List<int>`），`GameStartManager.ToTurnManagerFromLoad()` 读取该列表作为 `BeginGameFromMinigame` 的玩家顺序。
+**控制方式（UI 按钮，TetrisNetworkSync.cs 读取）**：
+- 每个玩家列底部生成 4 个按钮：← → ↻ ↓（软落长按）
+- 联网后按钮输入经 TetrisNetworkSync 中继
 
----
+**结算流程**：
+- 第一名完成 → `FinishGame()` 立即触发
+- 未完成玩家按 `GetCurrentMaxHeight()` 降序追加到 `finishOrder`
+- `finishOrder` 写入 `GameDataManager.minigameRanking`
+- 3 秒后 `SceneManager.LoadScene("MainGameScene")`
 
-##### `TetrisPlayerColumn.cs` — 单玩家列区域
+**TetrisNetworkSync.cs**（当前为 stub，待联网实现）：
+- 输入收集（按钮回调）→ 调用 `col.currentPiece` 的移动方法
+- 物理广播：Host 收集所有落地刚体状态（pos/rot/vel），广播给客户端插值追赶
 
-```
-路径: Scripts/BlockStack/TetrisPlayerColumn.cs
-```
-
-关键字段：
-```csharp
-public int playerId;                      // 对应大地图的 playerId
-public Transform spawnPoint;             // 新方块生成位置（列顶中心）
-public Transform finishLineTransform;    // 高度线位置（Y=18）
-public GameObject blockUnitPrefab;       // 1x1x1 单元预制体（无 Rigidbody）
-public TextMeshPro playerLabel;          // 显示玩家编号/状态
-private TetrisPiece currentPiece;        // 当前活动方块
-private List<Rigidbody> settledBlocks;   // 所有已落地刚体（供 NetworkSync 遍历）
-private bool isFinished;
-```
-
-关键方法：
-```csharp
-public void Init(int pid)                     // 设置 playerId，初始化 UI 标签
-public void SpawnNextPiece()                  // 随机选形状 → 实例化 TetrisPiece → 设置 currentPiece
-public void OnPieceSettled(TetrisPiece piece) // 接收 TetrisPiece 的落地回调 → 注册刚体 → 检测高度 → SpawnNextPiece
-private bool CheckFinishCondition()           // 遍历 settledBlocks，任意块 Y >= finishLineTransform.Y
-public void RegisterSettledBlock(Rigidbody rb)// 将落地刚体加入 settledBlocks 列表
-public List<Rigidbody> GetSettledBlocks()     // 供 TetrisNetworkSync 遍历广播
-```
-
-形状随机：`TetrominoType type = (TetrominoType)Random.Range(0, 7)`，传入 TetrisPiece.Init。
-
----
-
-##### `TetrisPiece.cs` — 当前活动方块
-
-```
-路径: Scripts/BlockStack/TetrisPiece.cs
-```
-
-关键字段：
-```csharp
-public enum TetrominoType { I, O, T, S, Z, L, J }
-
-// 7种形状的子块偏移（相对于中心，XY平面）
-static readonly Dictionary<TetrominoType, Vector2Int[]> Shapes;
-
-public TetrisPlayerColumn ownerColumn;
-public int playerId;                      // 控制此方块的玩家
-public float fallSpeed = 2f;             // 自然下落速度（units/秒）
-public float softDropMultiplier = 5f;
-private List<Transform> blockUnits;      // 子块 Transform 列表
-private bool isSettled = false;
-private Rigidbody pieceRb;               // 整体 Kinematic Rigidbody（未落地时）
-```
-
-关键方法：
-```csharp
-public void Init(TetrominoType type, TetrisPlayerColumn column, int pid)
-    // 根据 Shapes[type] 实例化子块，定位到 spawnPoint，设为 Kinematic
-
-void Update()
-    // 自然下落：transform.position += Vector3.down * fallSpeed * Time.deltaTime
-    // 检测落地：任意子块触碰到其他 Collider → 调用 Settle()
-
-public void MoveLeft()   // transform.position += Vector3.left * 1f（整块移动）
-public void MoveRight()  // transform.position += Vector3.right * 1f
-public void RotateCW()   // transform.Rotate(0, 0, -90)（绕Z轴顺时针）
-public void SoftDrop()   // fallSpeed 临时 *= softDropMultiplier
-public void HardDrop()   // Raycast 向下找最低合法位置 → 瞬移 → Settle()
-
-void Settle()
-    // isSettled = true → 禁用整体 Rigidbody
-    // 遍历所有 blockUnits：Detach from parent → AddComponent<Rigidbody>()
-    //   → 设置 constraints(FreezePositionZ | FreezeRotationX | FreezeRotationY)
-    //   → ownerColumn.RegisterSettledBlock(rb)
-    // → ownerColumn.OnPieceSettled(this)
-```
-
-输入由 `TetrisNetworkSync` 轮询键盘后调用对应方法，`TetrisPiece` 本身不直接读取 Input。
-
----
-
-##### `TetrisNetworkSync.cs` — 输入收集 + 物理状态同步
-
-```
-路径: Scripts/BlockStack/TetrisNetworkSync.cs
-```
-
-关键字段：
-```csharp
-public bool isHost = true;               // 模拟阶段默认 true（单机），联网后由房间角色决定
-public float syncInterval = 0.05f;       // 广播间隔（约 20Hz）
-private float syncTimer;
-
-// 各玩家的键位绑定
-static readonly KeyCode[][] KeyBindings = {
-    new[]{ KeyCode.A, KeyCode.D, KeyCode.W, KeyCode.S, KeyCode.Space },    // P1
-    new[]{ KeyCode.LeftArrow, KeyCode.RightArrow, KeyCode.UpArrow, KeyCode.DownArrow, KeyCode.Return }, // P2
-    new[]{ KeyCode.J, KeyCode.L, KeyCode.I, KeyCode.K, KeyCode.U },        // P3
-    new[]{ KeyCode.Keypad4, KeyCode.Keypad6, KeyCode.Keypad8, KeyCode.Keypad5, KeyCode.Keypad0 }, // P4
-    new[]{ KeyCode.G, KeyCode.H, KeyCode.Y, KeyCode.B, KeyCode.N },        // P5
-    // P6 暂缺（6人时需外接手柄或触屏）
-};
-// 顺序: [左, 右, 旋转CW, 软落, 硬落]
-```
-
-关键方法：
-```csharp
-void Update()
-    // 遍历 KeyBindings → 检测按键 → 调用对应 column.currentPiece 的方法
-
-void FixedUpdate()
-    // if (isHost && syncTimer >= syncInterval)
-    //   → 遍历所有 column.GetSettledBlocks()
-    //   → 收集 (instanceID, pos.x, pos.y, rot.z, vel.x, vel.y, angVel.z)
-    //   → BroadcastPhysicsState(data)（模拟阶段：空实现）
-
-public void ReceivePhysicsState(PhysicsStatePacket packet)
-    // 非 Host 客户端收到广播后：找到对应 Rigidbody → 插值位置/旋转
-
-[System.Serializable]
-public struct PhysicsStatePacket {
-    public int blockInstanceId;
-    public float posX, posY, rotZ;
-    public float velX, velY, angVelZ;
-}
-```
-
-**`GameDataManager` 需新增字段**：
-```csharp
-[Header("小游戏结算")]
-public List<int> minigameRanking = new List<int>(); // 按名次存 playerId，由 TetrisGameController.BackToMainGame() 写入
-public List<string> minigameScenes = new List<string> { "Minigame_BlockStack" }; // SwitchToRandomMinigame 从此列表随机
-```
-
-**`SwitchToRandomMinigame()` 修改**：
-```csharp
-// 改为从 minigameScenes 随机选取，而不是硬编码 "MinigameScene"
-string scene = minigameScenes[Random.Range(0, minigameScenes.Count)];
-SceneManager.LoadScene(scene);
-```
-
-**`GameStartManager.ToTurnManagerFromLoad()` 读取排名**：
-```csharp
-// 若 minigameRanking 不为空，按排名顺序重排 survivors 列表
-if (GameDataManager.Instance.minigameRanking.Count > 0)
-    survivors = survivors.OrderBy(p => GameDataManager.Instance.minigameRanking.IndexOf(p.playerId)).ToList();
-GameDataManager.Instance.minigameRanking.Clear();
-```
-
-- [ ] 创建 `Minigame_BlockStack` 场景及 PlayerColumn Prefab（美术/场景搭建）
-- [ ] 实现 `TetrisGameController`、`TetrisPlayerColumn`、`TetrisPiece`、`TetrisNetworkSync`
-- [ ] 更新 `GameDataManager`（新增字段 + 修改 `SwitchToRandomMinigame`）
-- [ ] 更新 `GameStartManager.ToTurnManagerFromLoad()` 读取 `minigameRanking`
-- [ ] Addressables 异步预加载（最后一名玩家行动时静默下载）
+- [x] 创建 `Minigame_BlockStack` 场景及 BlockUnit 预制体
+- [x] 实现 `TetrisGameController`（程序化生成列，状态机，结算，返回）
+- [x] 实现 `TetrisPlayerColumn`（列管理，风系统，消行，胜利动画）
+- [x] 实现 `TetrisPiece`（混合物理下落，Ghost指示，边界检测）
+- [x] 实现 `SettledBlockMonitor`（吸附系统，加速度限制，Snap动画）
+- [x] 更新 `GameDataManager.minigameRanking` 字段
+- [ ] **TetrisNetworkSync 联网实现**（下一阶段重点）
 
 ### 第五阶段：特殊 NPC
 
@@ -546,17 +376,21 @@ GameDataManager.Instance.minigameRanking.Clear();
 
 ## 当前开发焦点
 
-**正在实现：Minigame_BlockStack 物理堆塔小游戏**
+**已完成：Minigame_BlockStack 单机功能**
+**下一阶段：BlockStack 联网同步（TetrisNetworkSync）**
 
 大地图核心回合流程已完成（联网模拟层、税收、淘汰、小游戏触发均已实现）。
+BlockStack 单机玩法已完整实现（物理堆塔、风系统、消行、胜利动画等）。
 
-**下一步（按顺序）**：
-1. 用户在 Unity 中创建 `Minigame_BlockStack` 场景 + PlayerColumn 预制体 + BlockUnit 预制体
-2. 实现 `TetrisPiece`（方块输入控制 + 落地物理切换）
-3. 实现 `TetrisPlayerColumn`（列管理 + 高度检测）
-4. 实现 `TetrisGameController`（游戏状态机 + 名次结算 + 返回主场景）
-5. 实现 `TetrisNetworkSync`（Host 物理广播 + 客户端插值）
-6. 更新 `GameDataManager.SwitchToRandomMinigame()` 改为加载 `Minigame_BlockStack`
+**下一步（BlockStack 联网）**：
+1. 确定同步策略（状态同步 vs 帧同步，见下方讨论）
+2. 实现 `TetrisNetworkSync`：输入收集 → 广播 → 远端执行
+3. 实现 `GameNetworkManager` 的 BlockStack 消息路由（`CMD_BS_INPUT` / `CMD_BS_STATE`）
+4. 处理 Host 离线/断线时的物理权威迁移
+
+**BlockStack 联网策略待决策**：
+- **方案A（帧同步）**：每帧收集本地输入广播，所有客户端用相同输入本地推算（适合实时对抗）
+- **方案B（状态同步）**：Host 运行物理，定期广播所有刚体状态，客户端插值追赶（实现更简单，但非 Host 有延迟感）
 
 ---
 
