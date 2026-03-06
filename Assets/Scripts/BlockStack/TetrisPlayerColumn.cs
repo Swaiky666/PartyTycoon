@@ -11,6 +11,7 @@ public class TetrisPlayerColumn : MonoBehaviour
     public Transform finishLineTransform;    // 高度线
     public GameObject blockUnitPrefab;       // 1×1×1 单元预制体（无 Rigidbody）
     public TextMeshPro playerLabel;          // 显示玩家编号/状态
+    [HideInInspector] public TextMeshPro rankText; // 地基下方名次文字（代码生成）
 
     [Header("分屏摄像机（可选，不填则不震屏）")]
     public Camera playerCamera;
@@ -32,6 +33,7 @@ public class TetrisPlayerColumn : MonoBehaviour
     private bool isFinished   = false;
     private bool isActive     = false;
     private bool isWindActive = false; // 风期间禁止生成新方块
+    private int  _currentRank = -1;   // 当前显示名次（-1 表示未初始化）
 
     // 正常游戏只做极端兜底清理（不吸附的方块交由风来清除）
     const float SafetyKillY = -20f;
@@ -63,12 +65,15 @@ public class TetrisPlayerColumn : MonoBehaviour
 
     // ── 初始化 ───────────────────────────────────────────────────────────────
 
-    public void Init(int pid, Color color, GameObject blockPrefab)
+    [HideInInspector] public string playerName;
+
+    public void Init(int pid, Color color, GameObject blockPrefab, string name = "")
     {
         playerId        = pid;
         playerColor     = color;
         blockUnitPrefab = blockPrefab;
-        if (playerLabel != null) playerLabel.text = $"P{pid}";
+        playerName      = string.IsNullOrEmpty(name) ? $"P{pid}" : name;
+        if (playerLabel != null) playerLabel.text = playerName;
     }
 
     // ── 游戏开始 ─────────────────────────────────────────────────────────────
@@ -428,6 +433,10 @@ public class TetrisPlayerColumn : MonoBehaviour
             settledBlocks.Remove(t);
         }
 
+        // 消行：中等屏幕震动 + 音效
+        Camera.main?.DOShakePosition(0.45f, new Vector3(0.18f, 0.12f, 0f), 22, 68f, false);
+        TetrisGameController.Instance?.PlaySteelSound();
+
         // 更新每个受影响的 settled 根
         var settledMat = new PhysicMaterial("Settled")
         {
@@ -582,9 +591,7 @@ public class TetrisPlayerColumn : MonoBehaviour
             delay += stepDelay;
         }
 
-        // ── 摄像机震动 ───────────────────────────────────────────────────────────
-        Camera cam = playerCamera != null ? playerCamera : Camera.main;
-        cam?.DOShakePosition(0.65f, new Vector3(0.2f, 0.12f, 0f), 22, 70f, false);
+        // 胜利震动由 TetrisGameController.FinishGame() 统一处理，此处不重复调用
     }
 
     // 对 root 的每个直接子块执行胜利动画
@@ -615,11 +622,35 @@ public class TetrisPlayerColumn : MonoBehaviour
         block.DOPunchScale(Vector3.one * 0.25f, punchDur, 5, 0.3f).SetDelay(delay);
     }
 
-    // 吸附时震动该玩家的摄像机（需在 Inspector 或 BuildColumn 中赋值 playerCamera）
+    // 吸附时轻微震动 + 音效
     public void OnBlockSnapped()
     {
-        if (playerCamera != null)
-            playerCamera.DOShakePosition(0.22f, new Vector3(0.07f, 0.04f, 0f), 18, 60f, false);
+        Camera.main?.DOShakePosition(0.22f, new Vector3(0.07f, 0.04f, 0f), 18, 60f, false);
+        TetrisGameController.Instance?.PlaySnapSound();
+    }
+
+    // ── 名次显示 ──────────────────────────────────────────────────────────────
+
+    public void SetRank(int rank)
+    {
+        if (rank == _currentRank) return;
+        _currentRank = rank;
+        if (rankText == null) return;
+        rankText.text = GetOrdinal(rank);
+        rankText.transform.DOKill();
+        rankText.transform.localScale = Vector3.one;
+        rankText.transform.DOPunchScale(Vector3.one * 0.5f, 0.35f, 5, 0.3f);
+    }
+
+    static string GetOrdinal(int rank)
+    {
+        return rank switch
+        {
+            1 => "1st",
+            2 => "2nd",
+            3 => "3rd",
+            _ => $"{rank}th"
+        };
     }
 
     public List<Transform> GetSettledBlocks() => settledBlocks;

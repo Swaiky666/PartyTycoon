@@ -11,7 +11,8 @@ public class DiceAnimator : MonoBehaviour {
     public float transitionTime = 1.5f; 
 
     [Header("音效配置")]
-    public AudioClip rollingClip; // 骰子滚动时的循环音效
+    public AudioClip rollingClip; // 骰子快速滚动循环（投掷动画阶段）  建议时长：0.5–1.5s 可循环
+    public AudioClip idleRollClip;// 等待玩家投骰时空闲旋转循环       建议时长：1.0–3.0s 可无缝循环
 
     [Header("打磨配置")]
     public float punchScaleAmount = 1.2f; 
@@ -22,6 +23,9 @@ public class DiceAnimator : MonoBehaviour {
 
     [Header("引用的子物体模型")]
     public GameObject diceModel; 
+
+    // 专用于空闲旋转音效的 AudioSource，与 AudioManager.sfxSource 独立，互不干扰
+    private AudioSource _idleAudioSource;
 
     private bool isIdle = false;
     private bool isRolling = false;
@@ -37,6 +41,11 @@ public class DiceAnimator : MonoBehaviour {
         if (diceModel != null) {
             originalScale = diceModel.transform.localScale;
         }
+
+        _idleAudioSource             = gameObject.AddComponent<AudioSource>();
+        _idleAudioSource.playOnAwake = false;
+        _idleAudioSource.loop        = true;
+
         ShowDice(false);
     }
 
@@ -52,8 +61,10 @@ public class DiceAnimator : MonoBehaviour {
 
     public void ShowDice(bool show) {
         diceModel.SetActive(show);
-        // 关闭显示时务必停止音效
-        if (!show && AudioManager.Instance != null) AudioManager.Instance.StopSFX();
+        if (!show) {
+            if (AudioManager.Instance != null) AudioManager.Instance.StopSFX();
+            _idleAudioSource?.Stop();
+        }
     }
 
     public void ShowAndIdle() {
@@ -61,8 +72,12 @@ public class DiceAnimator : MonoBehaviour {
         isRolling = false;
         isLocking = false;
         currentSpeed = idleSpinSpeed;
-        // Idle 状态不播放音效，所以确保停止
+        // 停止快速滚动音效，启动空闲旋转循环音
         if (AudioManager.Instance != null) AudioManager.Instance.StopSFX();
+        if (idleRollClip != null && _idleAudioSource != null && !_idleAudioSource.isPlaying) {
+            _idleAudioSource.clip = idleRollClip;
+            _idleAudioSource.Play();
+        }
     }
 
     public IEnumerator PlayRollSequence(int result, System.Action onComplete) {
@@ -70,7 +85,8 @@ public class DiceAnimator : MonoBehaviour {
         isIdle = false;
         isLocking = false;
 
-        // --- 开始播放骰子音效 ---
+        // 停止空闲旋转音，开始快速滚动音
+        _idleAudioSource?.Stop();
         if (AudioManager.Instance != null && rollingClip != null) {
             AudioManager.Instance.PlayLoopingSFX(rollingClip);
         }

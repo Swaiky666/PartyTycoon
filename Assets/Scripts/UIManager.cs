@@ -27,9 +27,14 @@ public class UIManager : MonoBehaviour {
         if (Instance == null) Instance = this;
         if (actionButton != null) {
             buttonText = actionButton.GetComponentInChildren<TextMeshProUGUI>();
+            actionButton.onClick.AddListener(() => AudioManager.Instance?.PlayButtonClick());
         }
-
+        if (viewButton != null)
+            viewButton.onClick.AddListener(() => AudioManager.Instance?.PlayButtonClick());
+        if (cardButton != null)
+            cardButton.onClick.AddListener(() => AudioManager.Instance?.PlayButtonClick());
         if (testSwitchSceneButton != null) {
+            testSwitchSceneButton.onClick.AddListener(() => AudioManager.Instance?.PlayButtonClick());
             testSwitchSceneButton.onClick.AddListener(OnTestSwitchClicked);
         }
     }

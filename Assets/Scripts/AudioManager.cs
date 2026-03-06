@@ -8,6 +8,9 @@ public class AudioManager : MonoBehaviour {
     public AudioSource bgmSource;
     public AudioSource sfxSource;
 
+    [Header("通用音效（Inspector 拖入）")]
+    public AudioClip sfxButtonClick;   // UI 按钮点击  建议时长：0.05–0.15s  短促 click/tap
+
     [Header("音量设置 (0-1)")]
     [Range(0, 1)] public float masterVolume = 1.0f;
     [Range(0, 1)] public float bgmVolume = 0.8f;
@@ -36,6 +39,8 @@ public class AudioManager : MonoBehaviour {
     }
 
     // --- 音效控制 ---
+    public void PlayButtonClick() => PlaySFX(sfxButtonClick);
+
     // 播放一次性音效
     public void PlaySFX(AudioClip clip) {
         if (clip == null) return;

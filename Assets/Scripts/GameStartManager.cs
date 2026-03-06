@@ -15,6 +15,7 @@ public class GameStartManager : MonoBehaviour {
 
     void Awake() {
         Instance = this;
+        Screen.SetResolution(750, 1334, false);
     }
 
     void Start() {

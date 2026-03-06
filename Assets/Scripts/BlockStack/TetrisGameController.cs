@@ -3,7 +3,6 @@ using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine.UI;
-using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using DG.Tweening;
 
@@ -19,10 +18,8 @@ public class TetrisGameController : MonoBehaviour
     [Header("UI 引用")]
     public Canvas          gameCanvas;            // 主 Canvas（按钮生成到此处）
     public TextMeshProUGUI countdownText;
-    public TextMeshProUGUI statusText;
-    public TextMeshProUGUI rankingText;
     [Header("游戏配置")]
-    public float countdownDuration = 3f;
+    public float countdownDuration = 5f;
     public float gameTimeLimit     = 200f;    // 游戏时限（秒）
 
     [Header("大风配置")]
@@ -34,6 +31,13 @@ public class TetrisGameController : MonoBehaviour
     public float columnWidth    = 5f;         // 列宽（单位）
     public float finishLineY    = 18f;        // 完成高度线
     public float spawnY         = 19f;        // 方块生成 Y
+
+    [Header("音效（Inspector 拖入）")]
+    public AudioClip sfxRotate;   // 旋转方块       建议时长：0.15–0.25s  短促 click/swish
+    public AudioClip sfxSnap;     // 方块吸附锁定   建议时长：0.25–0.40s  清脆 thud/lock
+    public AudioClip sfxSteel;    // 五连锁定消行   建议时长：0.50–0.80s  厚重金属 clank
+    public AudioClip sfxFinish;   // 胜利结束       建议时长：1.50–3.00s  短小 fanfare
+    public AudioClip sfxWind;     // 吹风           建议时长：2.00–4.00s  持续 whoosh（会循环）
 
     [Header("玩家颜色（按玩家序号对应）")]
     public Color[] playerColors = new Color[]
@@ -48,17 +52,61 @@ public class TetrisGameController : MonoBehaviour
 
     // ── 运行时 ───────────────────────────────────────────────────────────────
 
-    [HideInInspector] public List<TetrisPlayerColumn> columns = new List<TetrisPlayerColumn>();
+    [HideInInspector] public List<TetrisPlayerColumn> columns     = new List<TetrisPlayerColumn>();
+    [HideInInspector] public TetrisPlayerColumn       localColumn = null; // 本机玩家控制的列
 
-    private List<int> finishOrder = new List<int>();
+    private List<int>               finishOrder    = new List<int>();
+    private List<TetrisPlayerColumn> _liveRankOrder = new List<TetrisPlayerColumn>();
     private float     gameTimer   = 0f;
     private float     windTimer   = 0f;
     private bool      isPlaying   = false;
     private int       activePlayers;
 
+    const float OvertakeThreshold = 1.0f; // 必须领先这么多才能超越名次
+
+    static readonly string[] RandomNames =
+    {
+        "Blaze", "Storm", "Nova", "Pixel",
+        "Echo",  "Spark", "Frost", "Volt",
+        "Drift", "Neon",  "Flux",  "Zap"
+    };
+
     // ── 生命周期 ─────────────────────────────────────────────────────────────
 
-    void Awake() { Instance = this; }
+    AudioSource _sfxSource;
+    AudioSource _windSource;
+
+    void Awake()
+    {
+        Instance = this;
+        Screen.SetResolution(1334, 750, false);
+
+        _sfxSource              = gameObject.AddComponent<AudioSource>();
+        _sfxSource.playOnAwake  = false;
+
+        _windSource             = gameObject.AddComponent<AudioSource>();
+        _windSource.playOnAwake = false;
+        _windSource.loop        = true;  // 风声循环直到风结束
+    }
+
+    // ── 音效接口（供其他脚本调用）────────────────────────────────────────────
+    public void PlayRotateSound() => PlaySfx(sfxRotate);
+    public void PlaySnapSound()   => PlaySfx(sfxSnap);
+    public void PlaySteelSound()  => PlaySfx(sfxSteel);
+    public void PlayFinishSound() => PlaySfx(sfxFinish);
+
+    public void PlayWindSound()
+    {
+        if (sfxWind == null) return;
+        _windSource.clip = sfxWind;
+        _windSource.Play();
+    }
+    public void StopWindSound() => _windSource.Stop();
+
+    void PlaySfx(AudioClip clip)
+    {
+        if (clip != null) _sfxSource.PlayOneShot(clip);
+    }
 
     void Start()
     {
@@ -68,12 +116,15 @@ public class TetrisGameController : MonoBehaviour
             1, 6);
 
         finishLineY *= 1.5f;
-        spawnY = finishLineY + 1f;
+        spawnY = finishLineY + 8f;
 
         GenerateColumns(activePlayers, saved);
-        GenerateButtonPanels();
-        if (rankingText != null) rankingText.gameObject.SetActive(false);
-        if (statusText != null) statusText.gameObject.SetActive(false);
+        ResolveLocalColumn(saved);
+
+        // 方块雨装饰效果
+        GameObject rainGo = new GameObject("TetrisRainEffect");
+        TetrisRainEffect rain = rainGo.AddComponent<TetrisRainEffect>();
+        rain.Init(blockUnitPrefab);
         StartCoroutine(CountdownRoutine());
     }
 
@@ -107,19 +158,21 @@ public class TetrisGameController : MonoBehaviour
 
     void TriggerWind()
     {
-        if (statusText != null) statusText.text = "大风来袭！！";
-        StartCoroutine(ClearWindStatus());
-
         // 随机选一个横向方向，所有列同向
         float dir = Random.value > 0.5f ? 1f : -1f;
         foreach (var col in columns)
             col.ApplyWind(dir * windForce);
+
+        PlayWindSound();
+        TetrisRainEffect.Instance?.OnWindStart(dir);
+        StartCoroutine(EndWindRain());
     }
 
-    IEnumerator ClearWindStatus()
+    IEnumerator EndWindRain()
     {
-        yield return new WaitForSeconds(2f);
-        if (isPlaying && statusText != null) statusText.text = "把方块堆到红线！";
+        yield return new WaitForSeconds(3.5f);
+        StopWindSound();
+        TetrisRainEffect.Instance?.OnWindEnd();
     }
 
     // ── 程序化生成所有列 ──────────────────────────────────────────────────────
@@ -129,19 +182,33 @@ public class TetrisGameController : MonoBehaviour
         float totalWidth = (count - 1) * columnSpacing;
         float startX     = -totalWidth / 2f;
 
+        // 随机打乱名字池，取前 count 个
+        var namePool = new List<string>(RandomNames);
+        for (int k = namePool.Count - 1; k > 0; k--)
+        {
+            int j = Random.Range(0, k + 1);
+            (namePool[k], namePool[j]) = (namePool[j], namePool[k]);
+        }
+
         for (int i = 0; i < count; i++)
         {
-            float colX = startX + i * columnSpacing;
-            int   pid  = (saved != null && i < saved.Count) ? saved[i].playerId : (i + 1);
-            Color col  = i < playerColors.Length ? playerColors[i] : Color.white;
+            float  colX  = startX + i * columnSpacing;
+            int    pid   = (saved != null && i < saved.Count) ? saved[i].playerId : (i + 1);
+            Color  color = i < playerColors.Length ? playerColors[i] : Color.white;
+            string name  = i < namePool.Count ? namePool[i] : $"P{pid}";
 
-            TetrisPlayerColumn column = BuildColumn(i, colX, pid, col);
+            TetrisPlayerColumn column = BuildColumn(i, colX, pid, color, name);
             column.spawnWaitSeconds = 0.4f;
             columns.Add(column);
         }
+
+        // 所有列共享一条完成高度线（用实际列位置算世界中心，避免 Controller 不在原点时偏移）
+        float worldCenterX = (columns[0].transform.position.x + columns[count - 1].transform.position.x) / 2f;
+        Transform sharedLine = BuildSharedFinishLine(count, worldCenterX);
+        foreach (var col in columns) col.finishLineTransform = sharedLine;
     }
 
-    TetrisPlayerColumn BuildColumn(int index, float worldX, int pid, Color color)
+    TetrisPlayerColumn BuildColumn(int index, float worldX, int pid, Color color, string playerName)
     {
         // ── 父物体 ────────────────────────────────────────────────────────────
         GameObject colGo = new GameObject($"PlayerColumn_{pid}");
@@ -174,15 +241,7 @@ public class TetrisGameController : MonoBehaviour
             // 地基不需要 Rigidbody，BoxCollider 保留作为静态地板
         }
 
-        // ── 完成高度线（细长红色 Cube，不参与物理） ───────────────────────────
-        GameObject finishGo = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        finishGo.name = "FinishLine";
-        finishGo.transform.SetParent(colGo.transform);
-        finishGo.transform.localPosition = new Vector3(0f, finishLineY, 0f);
-        finishGo.transform.localScale    = new Vector3(columnWidth, 0.05f, 0.5f);
-        finishGo.GetComponent<Renderer>().material.color = Color.red;
-        Destroy(finishGo.GetComponent<BoxCollider>()); // 不参与物理
-        column.finishLineTransform = finishGo.transform;
+        // finishLineTransform 由 BuildSharedFinishLine() 统一设置，此处留空
 
         // ── SpawnPoint ────────────────────────────────────────────────────────
         GameObject spawnGo = new GameObject("SpawnPoint");
@@ -190,133 +249,72 @@ public class TetrisGameController : MonoBehaviour
         spawnGo.transform.localPosition = new Vector3(0f, spawnY, 0f);
         column.spawnPoint = spawnGo.transform;
 
-        // ── 玩家标签（需要 TextMeshPro 包，可选） ────────────────────────────
-        // column.playerLabel = ... （如需 UI 标签，在子 Canvas 上添加 TMPro 组件后拖入）
+        // ── 名次文字（TextMeshPro 3D，地基正下方） ───────────────────────────
+        GameObject rankGo = new GameObject("RankText");
+        rankGo.transform.SetParent(colGo.transform);
+        rankGo.transform.localPosition = new Vector3(0f, -1.8f, -0.5f); // 稍微偏向摄像机
+        TextMeshPro rankTmp = rankGo.AddComponent<TextMeshPro>();
+        rankTmp.text      = playerName;   // 倒计时期间显示玩家名，开始后被 SetRank 替换
+        rankTmp.fontSize  = 12.5f;
+        rankTmp.alignment = TextAlignmentOptions.Center;
+        rankTmp.color     = color;
+        rankTmp.fontStyle = FontStyles.Bold;
+        column.rankText   = rankTmp;
 
         // ── 初始化 Column ─────────────────────────────────────────────────────
-        column.Init(pid, color, blockUnitPrefab);
+        column.Init(pid, color, blockUnitPrefab, playerName);
         column.rowWidth        = Mathf.RoundToInt(columnWidth);
         column.columnHalfWidth = columnWidth / 2f;
 
         return column;
     }
 
-    // ── 底部操作按钮（每列三个：← → ↻）────────────────────────────────────
+    // ── 横跨所有列的共享完成高度线 ───────────────────────────────────────────
 
-    void GenerateButtonPanels()
+    Transform BuildSharedFinishLine(int count, float worldCenterX)
     {
-        if (gameCanvas == null) return;
+        float lineWidth = (count - 1) * columnSpacing + columnWidth;
 
-        int   count  = columns.Count;
-        float panelW = 165f;
-        float gap    = 10f;
-        float totalW = count * panelW + (count - 1) * gap;
-        float startX = -totalW / 2f + panelW / 2f;
+        GameObject go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        go.name = "FinishLine";
+        go.transform.SetParent(transform);
+        // 用世界坐标定位，保证居中不受 Controller 自身位置影响
+        go.transform.position   = new Vector3(worldCenterX, finishLineY, 0f);
+        go.transform.localScale = new Vector3(lineWidth, 0.22f, 0.01f);
+        Destroy(go.GetComponent<BoxCollider>());
 
-        for (int i = 0; i < count; i++)
-            CreateButtonPanel(columns[i], startX + i * (panelW + gap));
+        Renderer rend = go.GetComponent<Renderer>();
+        Material mat  = new Material(rend.sharedMaterial);
+        // 开启透明模式（Standard Shader Transparent）
+        mat.SetFloat("_Mode", 3);
+        mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+        mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+        mat.SetInt("_ZWrite", 0);
+        mat.DisableKeyword("_ALPHATEST_ON");
+        mat.EnableKeyword("_ALPHABLEND_ON");
+        mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+        mat.renderQueue = 3000;
+        mat.color = new Color(1f, 1f, 1f, 0.35f);   // 白色，35% 不透明
+        mat.EnableKeyword("_EMISSION");
+        mat.SetColor("_EmissionColor", Color.white * 1.5f);
+        rend.material = mat;
+
+        return go.transform;
     }
 
-    void CreateButtonPanel(TetrisPlayerColumn col, float posX)
+    // ── 本机玩家列识别 ────────────────────────────────────────────────────────
+
+    void ResolveLocalColumn(List<PlayerState> saved)
     {
-        GameObject panel = new GameObject($"BtnPanel_P{col.playerId}");
-        panel.transform.SetParent(gameCanvas.transform, false);
+        // 优先从 GameDataManager 取本机玩家 ID（联网时由服务端分配）
+        // 当前模拟阶段：取存档第一位，或直接用 columns[0]
+        int localPid = -1;
+        if (saved != null && saved.Count > 0)
+            localPid = saved[0].playerId;
 
-        RectTransform rt = panel.AddComponent<RectTransform>();
-        rt.anchorMin        = new Vector2(0.5f, 0f);
-        rt.anchorMax        = new Vector2(0.5f, 0f);
-        rt.pivot            = new Vector2(0.5f, 0f);
-        rt.anchoredPosition = new Vector2(posX, 20f);
-        rt.sizeDelta        = new Vector2(165f, 70f);
-
-        float btnW = 35f, btnH = 65f, btnGap = 8.33f;
-        float startBX = -1.5f * (btnW + btnGap);
-
-        AddButton(panel.transform, "←", () => col.currentPiece?.MoveLeft(),  startBX + 0 * (btnW + btnGap), btnW, btnH);
-        AddButton(panel.transform, "→", () => col.currentPiece?.MoveRight(), startBX + 1 * (btnW + btnGap), btnW, btnH);
-        AddButton(panel.transform, "↻", () => col.currentPiece?.RotateCW(),  startBX + 2 * (btnW + btnGap), btnW, btnH);
-        AddSoftDropButton(panel.transform, col,                               startBX + 3 * (btnW + btnGap), btnW, btnH);
-    }
-
-    void AddSoftDropButton(Transform parent, TetrisPlayerColumn col,
-                           float posX, float width, float height)
-    {
-        GameObject go = new GameObject("↓");
-        go.transform.SetParent(parent, false);
-
-        RectTransform rt = go.AddComponent<RectTransform>();
-        rt.anchorMin        = new Vector2(0.5f, 0.5f);
-        rt.anchorMax        = new Vector2(0.5f, 0.5f);
-        rt.pivot            = new Vector2(0.5f, 0.5f);
-        rt.anchoredPosition = new Vector2(posX, 0f);
-        rt.sizeDelta        = new Vector2(width, height);
-
-        Image img = go.AddComponent<Image>();
-        img.color = new Color(0.1f, 0.1f, 0.1f, 0.75f);
-
-        EventTrigger trigger = go.AddComponent<EventTrigger>();
-
-        var downEntry = new EventTrigger.Entry { eventID = EventTriggerType.PointerDown };
-        downEntry.callback.AddListener(_ => col.softDropHeld = true);
-        trigger.triggers.Add(downEntry);
-
-        var upEntry = new EventTrigger.Entry { eventID = EventTriggerType.PointerUp };
-        upEntry.callback.AddListener(_ => col.softDropHeld = false);
-        trigger.triggers.Add(upEntry);
-
-        // 文字标签
-        GameObject textGo = new GameObject("Text");
-        textGo.transform.SetParent(go.transform, false);
-        RectTransform trt = textGo.AddComponent<RectTransform>();
-        trt.anchorMin = Vector2.zero;
-        trt.anchorMax = Vector2.one;
-        trt.offsetMin = Vector2.zero;
-        trt.offsetMax = Vector2.zero;
-        TextMeshProUGUI tmp = textGo.AddComponent<TextMeshProUGUI>();
-        tmp.text      = "↓";
-        tmp.fontSize  = 30f;
-        tmp.alignment = TextAlignmentOptions.Center;
-        tmp.color     = Color.white;
-    }
-
-    void AddButton(Transform parent, string label, System.Action onClick,
-                   float posX, float width, float height)
-    {
-        GameObject go = new GameObject(label);
-        go.transform.SetParent(parent, false);
-
-        RectTransform rt = go.AddComponent<RectTransform>();
-        rt.anchorMin        = new Vector2(0.5f, 0.5f);
-        rt.anchorMax        = new Vector2(0.5f, 0.5f);
-        rt.pivot            = new Vector2(0.5f, 0.5f);
-        rt.anchoredPosition = new Vector2(posX, 0f);
-        rt.sizeDelta        = new Vector2(width, height);
-
-        Image img = go.AddComponent<Image>();
-        img.color = new Color(0.1f, 0.1f, 0.1f, 0.75f);
-
-        Button btn = go.AddComponent<Button>();
-        ColorBlock cb       = btn.colors;
-        cb.highlightedColor = new Color(0.35f, 0.35f, 0.35f, 0.9f);
-        cb.pressedColor     = new Color(0.6f, 0.6f, 0.6f, 1f);
-        btn.colors          = cb;
-        btn.onClick.AddListener(() => onClick());
-
-        // TMP 文字标签
-        GameObject textGo = new GameObject("Text");
-        textGo.transform.SetParent(go.transform, false);
-
-        RectTransform trt = textGo.AddComponent<RectTransform>();
-        trt.anchorMin = Vector2.zero;
-        trt.anchorMax = Vector2.one;
-        trt.offsetMin = Vector2.zero;
-        trt.offsetMax = Vector2.zero;
-
-        TextMeshProUGUI tmp = textGo.AddComponent<TextMeshProUGUI>();
-        tmp.text      = label;
-        tmp.fontSize  = 30f;
-        tmp.alignment = TextAlignmentOptions.Center;
-        tmp.color     = Color.white;
+        localColumn = columns.Find(c => c.playerId == localPid);
+        if (localColumn == null && columns.Count > 0)
+            localColumn = columns[0];
     }
 
     // ── 倒计时 ───────────────────────────────────────────────────────────────
@@ -346,22 +344,28 @@ public class TetrisGameController : MonoBehaviour
     void StartGame()
     {
         isPlaying = true;
-        if (statusText != null)
-        {
-            statusText.gameObject.SetActive(true);
-            statusText.text = "把方块堆到红线！";
-        }
         if (countdownText != null)
         {
             countdownText.gameObject.SetActive(true);
             countdownText.text = Mathf.CeilToInt(gameTimeLimit).ToString();
         }
-        if (rankingText != null) rankingText.gameObject.SetActive(true);
-
+        _liveRankOrder = new List<TetrisPlayerColumn>(columns);
         foreach (var col in columns) col.BeginSpawning();
 
-        TetrisNetworkSync sync = GetComponent<TetrisNetworkSync>();
-        if (sync != null) sync.enabled = true;
+        // 本机玩家：挂输入处理器
+        if (localColumn != null)
+        {
+            var inputHandler = gameObject.AddComponent<TetrisInputHandler>();
+            inputHandler.localColumn = localColumn;
+        }
+
+        // 非本机玩家列：挂 AI 模拟控制器
+        foreach (var col in columns)
+        {
+            if (col == localColumn) continue;
+            var ai = col.gameObject.AddComponent<TetrisAIController>();
+            ai.StartAI(col);
+        }
     }
 
     // ── 玩家完成回调 ─────────────────────────────────────────────────────────
@@ -396,16 +400,19 @@ public class TetrisGameController : MonoBehaviour
         unfinished.Sort((a, b) => b.GetCurrentMaxHeight().CompareTo(a.GetCurrentMaxHeight()));
         foreach (var col in unfinished)
             if (!finishOrder.Contains(col.playerId)) finishOrder.Add(col.playerId);
-        if (statusText != null) statusText.text = "游戏结束！";
         int winnerId = finishOrder.Count > 0 ? finishOrder[0] : -1;
         foreach (var col in columns)
         {
+            // 停止 AI
+            var ai = col.GetComponent<TetrisAIController>();
+            if (ai != null) ai.StopAI();
+
             col.Stop();
             if (col.playerId == winnerId)
                 col.PlayVictoryAnim(); // 只有胜利玩家才触发特效
         }
-        // 全局摄像机震动（兜底：当各列未设置独立摄像机时）
-        Camera.main?.DOShakePosition(0.65f, new Vector3(0.2f, 0.12f, 0f), 22, 70f, false);
+        PlayFinishSound();
+        Camera.main?.DOShakePosition(1.0f, new Vector3(0.55f, 0.35f, 0f), 28, 80f, false);
 
         TetrisNetworkSync sync = GetComponent<TetrisNetworkSync>();
         if (sync != null) sync.enabled = false;
@@ -420,42 +427,48 @@ public class TetrisGameController : MonoBehaviour
         BackToMainGame();
     }
 
-    // 实时排名（游戏中每帧更新，按当前最高高度排序）
+    // 实时排名（游戏中每帧更新，带滞后阈值防止名次抖动）
     void UpdateLiveRanking()
     {
-        if (rankingText == null) return;
+        // ── 提取未完成玩家，保持 _liveRankOrder 中的稳定顺序 ─────────────────
+        var unfinished = new List<TetrisPlayerColumn>();
+        foreach (var col in _liveRankOrder)
+            if (!col.IsFinished()) unfinished.Add(col);
 
-        // 完成的列按完成顺序钉在前面，未完成的列按当前高度在后面排
-        var sorted = new List<TetrisPlayerColumn>(columns);
-        sorted.Sort((a, b) =>
+        // ── 带阈值的冒泡排序：后者必须领先 OvertakeThreshold 才能超越 ─────────
+        bool swapped;
+        do
         {
-            bool aFin = a.IsFinished(), bFin = b.IsFinished();
-            if (aFin && bFin)
-                return finishOrder.IndexOf(a.playerId).CompareTo(finishOrder.IndexOf(b.playerId));
-            if (aFin) return -1;
-            if (bFin) return  1;
-            return b.GetCurrentMaxHeight().CompareTo(a.GetCurrentMaxHeight());
-        });
+            swapped = false;
+            for (int i = 0; i < unfinished.Count - 1; i++)
+            {
+                if (unfinished[i + 1].GetCurrentMaxHeight() >
+                    unfinished[i].GetCurrentMaxHeight() + OvertakeThreshold)
+                {
+                    (unfinished[i], unfinished[i + 1]) = (unfinished[i + 1], unfinished[i]);
+                    swapped = true;
+                }
+            }
+        } while (swapped);
 
-        System.Text.StringBuilder sb = new System.Text.StringBuilder("<b>当前名次</b>\n");
-        for (int i = 0; i < sorted.Count; i++)
-        {
-            var col = sorted[i];
-            string label = $"P{col.playerId}";
-            string mark = col.IsFinished() ? " <color=lime>完成</color>" : "";
-            sb.Append($"{i + 1}. {label}{mark}\n");
-        }
-        rankingText.text = sb.ToString();
+        // ── 重建完整排名：已完成在前（按完成顺序），未完成在后 ─────────────────
+        _liveRankOrder.Clear();
+        foreach (var pid in finishOrder)
+            foreach (var col in columns)
+                if (col.playerId == pid) { _liveRankOrder.Add(col); break; }
+        _liveRankOrder.AddRange(unfinished);
+
+        // ── 更新各列名次文字 ──────────────────────────────────────────────────
+        for (int i = 0; i < _liveRankOrder.Count; i++)
+            _liveRankOrder[i].SetRank(i + 1);
     }
 
-    // 最终名次（游戏结束后覆盖显示）
+    // 最终名次（游戏结束后锁定各列名次文字）
     void UpdateRankingUI()
     {
-        if (rankingText == null) return;
-        string txt = "<b>最终名次</b>\n";
         for (int i = 0; i < finishOrder.Count; i++)
-            txt += $"{i + 1}. 玩家 {finishOrder[i]}\n";
-        rankingText.text = txt;
+            foreach (var col in columns)
+                if (col.playerId == finishOrder[i]) { col.SetRank(i + 1); break; }
     }
 
     void BackToMainGame()

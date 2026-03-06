@@ -19,8 +19,8 @@ public class TetrisPiece : MonoBehaviour
     };
 
     [Header("下落配置")]
-    public float fallSpeed = 4f;
-    public float softDropMultiplier = 4f;
+    public float fallSpeed = 4.8f;          // 基础下落速度（原 4f × 1.2）
+    public float softDropMultiplier = 10f;  // 快速下落倍率
 
     // 激光检测距离：距下方物体 < 此值时切换为 Rigidbody 自由接触
     const float TouchDetectDist   = 1.5f;
@@ -208,7 +208,20 @@ public class TetrisPiece : MonoBehaviour
     {
         if (isSettled || isPhysicsFalling) return;
         transform.Rotate(0f, 0f, -90f);
-        if (WouldOverlapCurrent() || WouldExceedBoundsCurrent()) transform.Rotate(0f, 0f, 90f);
+        if (WouldOverlapCurrent() || WouldExceedBoundsCurrent())
+            transform.Rotate(0f, 0f, 90f);
+        else
+            TetrisGameController.Instance?.PlayRotateSound();
+    }
+
+    public void RotateCCW()
+    {
+        if (isSettled || isPhysicsFalling) return;
+        transform.Rotate(0f, 0f, 90f);
+        if (WouldOverlapCurrent() || WouldExceedBoundsCurrent())
+            transform.Rotate(0f, 0f, -90f);
+        else
+            TetrisGameController.Instance?.PlayRotateSound();
     }
 
     public void SetSoftDrop(bool active) { isSoftDropping = active; }
