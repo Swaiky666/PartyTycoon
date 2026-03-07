@@ -90,7 +90,18 @@ public class TetrisPlayerColumn : MonoBehaviour
     {
         if (isFinished || !isActive || blockUnitPrefab == null || isWindActive) return;
 
-        TetrisPiece.TetrominoType type = (TetrisPiece.TetrominoType)Random.Range(0, 7);
+        // 通过网络层决定方块类型（服务端权威），真实联网时保证各客户端方块序列一致
+        if (GameNetworkManager.Instance != null)
+            GameNetworkManager.Instance.SendBSSpawnRequest(playerId);
+        else
+            DoSpawnPiece((TetrisPiece.TetrominoType)Random.Range(0, 7));
+    }
+
+    /// <summary>[网络广播回调] 实际创建方块（由 TetrisGameController.ExecuteNetBSSpawn 调用）</summary>
+    public void DoSpawnPiece(TetrisPiece.TetrominoType type)
+    {
+        if (isFinished || !isActive || blockUnitPrefab == null || isWindActive) return;
+
         GameObject pieceObj = new GameObject($"Piece_P{playerId}_{type}");
         pieceObj.transform.position = spawnPoint != null
             ? spawnPoint.position

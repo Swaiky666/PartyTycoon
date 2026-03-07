@@ -50,9 +50,12 @@ public class TetrisPiece : MonoBehaviour
 
     // ── 初始化 ───────────────────────────────────────────────────────────────
 
+    public TetrominoType PieceType { get; private set; }
+
     public void Init(TetrominoType type, TetrisPlayerColumn column, int pid,
                      GameObject blockPrefab, Color color)
     {
+        PieceType    = type;
         ownerColumn  = column;
         playerId     = pid;
         _playerColor = color;

@@ -13,7 +13,7 @@ public class CardUIController : MonoBehaviour {
     public GameObject cardPrefab;       
 
     [Header("卡牌显示设置")]
-    public float cardSpacing = 650f;   
+    public float cardSpacing = 10f;
     public float swipeSensitivity = 1.1f; 
 
     private List<GameObject> spawnedCards = new List<GameObject>();
@@ -41,19 +41,25 @@ public class CardUIController : MonoBehaviour {
         spawnedCards.Clear();
 
         contentHolder.anchorMin = contentHolder.anchorMax = contentHolder.pivot = new Vector2(0.5f, 0.5f);
-        
+
+        const float cardScale = 0.5f;
+        // 视觉步长 = 卡牌原始宽度 × 缩放 + 间隙
+        RectTransform prefabRt = cardPrefab.GetComponent<RectTransform>();
+        float cardVisualWidth = prefabRt != null ? prefabRt.sizeDelta.x * cardScale : 300f;
+        float step = cardVisualWidth + cardSpacing;
+
         // maxX 直接设为0，minX 计算范围
-        minX = -(currentDataList.Count - 1) * cardSpacing;
+        minX = -(currentDataList.Count - 1) * step;
 
         for (int i = 0; i < currentDataList.Count; i++) {
             GameObject cardObj = Instantiate(cardPrefab, contentHolder);
-            cardObj.name = i.ToString(); 
-            
+            cardObj.name = i.ToString();
+
             RectTransform rt = cardObj.GetComponent<RectTransform>();
             rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
-            
-            // 保持 Inspector 原始大小，仅设置初始 X 位置
-            rt.anchoredPosition = new Vector2(i * cardSpacing, 0);
+
+            rt.localScale = Vector3.one * cardScale;
+            rt.anchoredPosition = new Vector2(i * step, 0);
             
             UpdateCardVisuals(cardObj, currentDataList[i]);
             
@@ -76,12 +82,16 @@ public class CardUIController : MonoBehaviour {
     }
 
     public void OnDragEnd(float velocityX) {
+        RectTransform prefabRt = cardPrefab.GetComponent<RectTransform>();
+        float cardVisualWidth = prefabRt != null ? prefabRt.sizeDelta.x * 0.5f : 300f;
+        float step = cardVisualWidth + cardSpacing;
+
         float inertia = velocityX * 0.12f;
         float predictedX = contentHolder.anchoredPosition.x + inertia;
-        int targetIndex = Mathf.RoundToInt(-predictedX / cardSpacing);
+        int targetIndex = Mathf.RoundToInt(-predictedX / step);
         targetIndex = Mathf.Clamp(targetIndex, 0, currentDataList.Count - 1);
-        
-        float finalX = -targetIndex * cardSpacing;
+
+        float finalX = -targetIndex * step;
         contentHolder.DOAnchorPosX(finalX, 0.45f).SetEase(Ease.OutBack);
     }
 
@@ -114,14 +124,22 @@ public class CardUIController : MonoBehaviour {
     public void OnCardClicked(int index) {
         if (currentDataList == null || index >= currentDataList.Count) return;
         CardBase selectedCard = currentDataList[index];
-        
-        cardUIPanel.SetActive(false);
 
-        if (TurnManager.Instance != null) {
-            TurnManager.Instance.EnterCardTargetingMode();
+        // 点击特效：先 punch，完成后再切到瞄准模式
+        GameObject clickedObj = index < spawnedCards.Count ? spawnedCards[index] : null;
+        System.Action proceed = () => {
+            cardUIPanel.SetActive(false);
+            if (TurnManager.Instance != null) TurnManager.Instance.EnterCardTargetingMode();
+            if (CardRangeFinder.Instance != null) CardRangeFinder.Instance.ShowRange(selectedCard);
+        };
+
+        if (clickedObj != null) {
+            clickedObj.transform.DOKill();
+            clickedObj.transform.DOPunchScale(Vector3.one * 0.06f, 0.10f, 4, 0.3f)
+                .OnComplete(() => proceed());
+        } else {
+            proceed();
         }
-
-        if (CardRangeFinder.Instance != null) CardRangeFinder.Instance.ShowRange(selectedCard);
         
         SetupCardButton("取消", () => {
             if (CardRangeFinder.Instance != null) CardRangeFinder.Instance.ClearHighlight();

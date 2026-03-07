@@ -158,13 +158,22 @@ public class TetrisGameController : MonoBehaviour
 
     void TriggerWind()
     {
-        // 随机选一个横向方向，所有列同向
+        // 随机选一个横向方向，Host 通过网络层广播给所有客户端（真实联网时只有 Host 调用此方法）
         float dir = Random.value > 0.5f ? 1f : -1f;
+        if (GameNetworkManager.Instance != null)
+            GameNetworkManager.Instance.SendBSWindRequest(dir * windForce);
+        else
+            ExecuteNetBSWind(dir * windForce);
+    }
+
+    /// <summary>[网络广播] 执行大风（GameNetworkManager 收到服务端广播后调用）</summary>
+    public void ExecuteNetBSWind(float horizontalForce)
+    {
         foreach (var col in columns)
-            col.ApplyWind(dir * windForce);
+            col.ApplyWind(horizontalForce);
 
         PlayWindSound();
-        TetrisRainEffect.Instance?.OnWindStart(dir);
+        TetrisRainEffect.Instance?.OnWindStart(Mathf.Sign(horizontalForce));
         StartCoroutine(EndWindRain());
     }
 
@@ -370,13 +379,30 @@ public class TetrisGameController : MonoBehaviour
 
     // ── 玩家完成回调 ─────────────────────────────────────────────────────────
 
+    /// <summary>由 TetrisPlayerColumn 检测到到达终点后调用，通过网络层发送请求</summary>
     public void OnPlayerFinished(int playerId)
+    {
+        if (GameNetworkManager.Instance != null)
+            GameNetworkManager.Instance.SendBSFinishRequest(playerId);
+        else
+            ExecuteNetBSFinish(playerId);
+    }
+
+    /// <summary>[网络广播] 确认玩家完成，记录名次，触发结束（GameNetworkManager 回调）</summary>
+    public void ExecuteNetBSFinish(int playerId)
     {
         if (finishOrder.Contains(playerId)) return;
         finishOrder.Add(playerId);
         Debug.Log($"[BlockStack] 玩家 {playerId} 完成！名次: {finishOrder.Count}");
         UpdateRankingUI();
         FinishGame(); // 第一个到达终点即触发结束
+    }
+
+    /// <summary>[网络广播] 在指定玩家列生成对应类型方块（GameNetworkManager 回调）</summary>
+    public void ExecuteNetBSSpawn(int playerId, int pieceTypeIndex)
+    {
+        var col = columns.Find(c => c.playerId == playerId);
+        col?.DoSpawnPiece((TetrisPiece.TetrominoType)pieceTypeIndex);
     }
 
     // ── 超时 ─────────────────────────────────────────────────────────────────

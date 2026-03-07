@@ -308,6 +308,58 @@ public class GameNetworkManager : MonoBehaviour
     }
 
     //========================================
+    // BlockStack 小游戏（生成 / 完成 / 大风）
+    //========================================
+
+    /// <summary>
+    /// [请求] 服务端决定下一个方块类型（保证多端随机序列一致）
+    /// <para>真实联网时：Host 生成类型并广播给所有客户端，非 Host 等待广播后再生成方块</para>
+    /// </summary>
+    public void SendBSSpawnRequest(int playerId)
+    {
+        StartCoroutine(SimulateBSSpawnServer(playerId));
+    }
+
+    private IEnumerator SimulateBSSpawnServer(int playerId)
+    {
+        yield return new WaitForSeconds(simulatedLatency);
+        int typeIndex = UnityEngine.Random.Range(0, 7);
+        TetrisGameController.Instance?.ExecuteNetBSSpawn(playerId, typeIndex);
+    }
+
+    /// <summary>
+    /// [请求] 玩家到达终点，服务端权威记录名次并广播游戏结束
+    /// </summary>
+    public void SendBSFinishRequest(int playerId)
+    {
+        Debug.Log($"<color=cyan>[BS网络请求] 玩家 {playerId} 到达终点</color>");
+        StartCoroutine(SimulateBSFinishServer(playerId));
+    }
+
+    private IEnumerator SimulateBSFinishServer(int playerId)
+    {
+        yield return new WaitForSeconds(simulatedLatency);
+        Debug.Log($"<color=yellow>[BS服务端] 玩家 {playerId} 完成，广播结束</color>");
+        TetrisGameController.Instance?.ExecuteNetBSFinish(playerId);
+    }
+
+    /// <summary>
+    /// [请求] Host 触发大风，服务端确认后广播力度给所有客户端
+    /// </summary>
+    public void SendBSWindRequest(float horizontalForce)
+    {
+        Debug.Log($"<color=cyan>[BS网络请求] 大风触发，方向 {(horizontalForce >= 0 ? "→" : "←")}（{horizontalForce:F1}）</color>");
+        StartCoroutine(SimulateBSWindServer(horizontalForce));
+    }
+
+    private IEnumerator SimulateBSWindServer(float horizontalForce)
+    {
+        yield return new WaitForSeconds(simulatedLatency);
+        Debug.Log($"<color=yellow>[BS服务端] 大风广播，力度 {horizontalForce:F1}</color>");
+        TetrisGameController.Instance?.ExecuteNetBSWind(horizontalForce);
+    }
+
+    //========================================
     // 辅助方法
     //========================================
 

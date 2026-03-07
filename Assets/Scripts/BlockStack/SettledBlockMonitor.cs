@@ -67,6 +67,7 @@ public class SettledBlockMonitor : MonoBehaviour
 
     void LimitAcceleration()
     {
+        if (_rb.isKinematic) { _prevVelocity = Vector3.zero; return; }
         Vector3 delta = _rb.velocity - _prevVelocity;
         float   dt    = Time.fixedDeltaTime;
 
@@ -87,6 +88,7 @@ public class SettledBlockMonitor : MonoBehaviour
 
     void UpdateSnap()
     {
+        if (_rb.isKinematic) { IsSnapped = true; return; }
         float posOffX = _rb.position.x - Mathf.Round(_rb.position.x);
         float posOffY = _rb.position.y - Mathf.Round(_rb.position.y);
 

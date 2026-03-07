@@ -243,6 +243,9 @@ MonoBehaviour:
   bankPrefab: {fileID: 1319817351213823019, guid: 399cdef97dd5449baa1d93490c2042f3, type: 3}
   prisonPrefab: {fileID: 1319817351213823019, guid: 399cdef97dd5449baa1d93490c2042f3, type: 3}
   dropHeight: 15
+  minigameRanking: 
+  minigameScenes:
+  - Minigame_BlockStack
 --- !u!1 &80170059
 GameObject:
   m_ObjectHideFlags: 0
@@ -372,7 +375,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 278, y: -321}
+  m_AnchoredPosition: {x: 572, y: -152}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &118166866
@@ -1045,7 +1048,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 536}
+  m_AnchoredPosition: {x: 0, y: 303}
   m_SizeDelta: {x: 450, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &632099713
@@ -1844,7 +1847,7 @@ MonoBehaviour:
   cardUIPanel: {fileID: 1142301787}
   contentHolder: {fileID: 132546992}
   cardPrefab: {fileID: 3193726809298855494, guid: d85c3130c29434b2da4e103cf9879ec7, type: 3}
-  cardSpacing: 600
+  cardSpacing: 450
   swipeSensitivity: 1
 --- !u!1 &852449576
 GameObject:
@@ -1927,6 +1930,7 @@ MonoBehaviour:
   viewButton: {fileID: 118166866}
   cardButton: {fileID: 1029890458}
   testSwitchSceneButton: {fileID: 1136806048}
+  taxNotificationText: {fileID: 0}
 --- !u!1 &876158992
 GameObject:
   m_ObjectHideFlags: 0
@@ -2410,6 +2414,7 @@ MonoBehaviour:
   fastRollDuration: 1
   transitionTime: 1
   rollingClip: {fileID: 8300000, guid: 96053522e57a547418c8168d7123e646, type: 3}
+  idleRollClip: {fileID: 0}
   punchScaleAmount: 1.2
   punchDuration: 0.3
   faceRotations:
@@ -2806,7 +2811,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 278, y: -455}
+  m_AnchoredPosition: {x: 572, y: -286}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1029890458
@@ -3090,6 +3095,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   diceAnimator: {fileID: 963194229}
+  taxRateStep: 0.05
+  taxRoundInterval: 3
+  currentTaxRate: 0
 --- !u!1 &1136806046
 GameObject:
   m_ObjectHideFlags: 0
@@ -3126,7 +3134,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 278, y: -197}
+  m_AnchoredPosition: {x: 572, y: -28}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1136806048
@@ -3480,6 +3488,8 @@ MonoBehaviour:
   - {fileID: 729674928}
   - {fileID: 1226197158}
   shopCardPrefab: {fileID: 8948869464870012319, guid: f0fa6710ca4ff4812ab8856a1f4a1126, type: 3}
+  cardSpacing: 150
+  rowOffsetY: 0
 --- !u!1 &1232993938
 GameObject:
   m_ObjectHideFlags: 0
@@ -3623,6 +3633,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   simulatedLatency: 0.1
+  playerCount: 6
 --- !u!4 &1306863355
 Transform:
   m_ObjectHideFlags: 0
@@ -4276,6 +4287,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   bgmSource: {fileID: 0}
   sfxSource: {fileID: 0}
+  sfxButtonClick: {fileID: 0}
   masterVolume: 1
   bgmVolume: 0.8
   sfxVolume: 1
@@ -4471,7 +4483,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: -455}
+  m_AnchoredPosition: {x: 0, y: -286}
   m_SizeDelta: {x: 200, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1725389757
@@ -5520,7 +5532,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -259, y: 626}
+  m_AnchoredPosition: {x: -550, y: 315}
   m_SizeDelta: {x: 200, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &2139740532
@@ -5700,6 +5712,18 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 963194228}
     m_Modifications:
+    - target: {fileID: 1520518211844720126, guid: 44d38d93672d74f0899e8c799444f54f, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.3
+      objectReference: {fileID: 0}
+    - target: {fileID: 1520518211844720126, guid: 44d38d93672d74f0899e8c799444f54f, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.3
+      objectReference: {fileID: 0}
+    - target: {fileID: 1520518211844720126, guid: 44d38d93672d74f0899e8c799444f54f, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.3
+      objectReference: {fileID: 0}
     - target: {fileID: 1520518211844720126, guid: 44d38d93672d74f0899e8c799444f54f, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0

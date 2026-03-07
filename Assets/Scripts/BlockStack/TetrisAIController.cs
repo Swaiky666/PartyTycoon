@@ -197,11 +197,31 @@ public class TetrisAIController : MonoBehaviour
     void PickRotation(TetrisPiece piece)
     {
         if (piece == null) return;
-        int times = Random.Range(0, 3);
-        for (int i = 0; i < times; i++)
+
+        switch (piece.PieceType)
         {
-            if (Random.value < 0.5f) piece.RotateCW();
-            else                     piece.RotateCCW();
+            case TetrisPiece.TetrominoType.L:
+            case TetrisPiece.TetrominoType.J:
+                // 默认 0°：L 钩在右下、J 钩在左下 → 重心偏低侧，容易倒
+                // 旋转 180°（2×CW）→ 钩移到上方，底部平整，稳定
+                piece.RotateCW();
+                piece.RotateCW();
+                break;
+
+            case TetrisPiece.TetrominoType.I:
+                // I 默认已水平，保持不动
+                break;
+
+            case TetrisPiece.TetrominoType.O:
+                // O 形对称，不需要旋转
+                break;
+
+            case TetrisPiece.TetrominoType.T:
+            case TetrisPiece.TetrominoType.S:
+            case TetrisPiece.TetrominoType.Z:
+                // 默认水平姿态较稳，25% 概率额外旋转一次增加多样性
+                if (Random.value < 0.25f) piece.RotateCW();
+                break;
         }
     }
 }
