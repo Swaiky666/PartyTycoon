@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 using TMPro;
 
 /// <summary>
@@ -84,8 +85,7 @@ public class RoomUI : MonoBehaviour {
 
     void OnBackClicked() {
         RoomManager.Instance?.RequestLeaveOrDisband();
-        // TODO: 返回主菜单（主菜单场景待开发）
-        Debug.Log("[RoomUI] 返回主菜单（TODO）");
+        SceneManager.LoadScene("MainMenuScene");
     }
 
     void OnStartClicked() {

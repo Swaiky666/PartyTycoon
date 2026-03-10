@@ -3,6 +3,14 @@ using System.Collections.Generic;
 using UnityEngine.SceneManagement;
 
 [System.Serializable]
+public class RoomPlayerInfo {
+    public int playerId;
+    public string playerName;
+    public int colorIndex;
+    public bool isAI;
+}
+
+[System.Serializable]
 public class PlayerState {
     public int playerId;
     public int currentGridId;
@@ -46,6 +54,10 @@ public class GameDataManager : MonoBehaviour {
 
     [Header("动画配置")]
     public float dropHeight = 15f;
+
+    [Header("房间配置（开局前写入）")]
+    [HideInInspector] public List<RoomPlayerInfo> roomPlayers = new List<RoomPlayerInfo>();
+    [HideInInspector] public int roomRoundCount = 5;
 
     [Header("小游戏结算")]
     [Tooltip("小游戏完成名次（按顺序存 playerId），由 TetrisGameController 写入")]
@@ -151,6 +163,22 @@ public class GameDataManager : MonoBehaviour {
         
         Debug.Log("【系统】数据及地图建筑恢复完成。");
         ClearCache();
+    }
+
+    /// <summary>由 RoomManager 在开始游戏前调用，将房间数据写入供 GameStartManager 读取。</summary>
+    public void SetupFromRoom(SlotData[] slots, int roundCount) {
+        roomPlayers.Clear();
+        roomRoundCount = roundCount;
+        int pid = 1;
+        foreach (var slot in slots) {
+            if (slot.state == SlotState.Empty) continue;
+            roomPlayers.Add(new RoomPlayerInfo {
+                playerId   = pid++,
+                playerName = slot.playerName,
+                colorIndex = slot.colorIndex,
+                isAI       = slot.state == SlotState.AI,
+            });
+        }
     }
 
     public void ClearCache() {

@@ -58,11 +58,25 @@ public class GameStartManager : MonoBehaviour {
     }
 
     void CreatePlayerInstances() {
-        for (int i = 1; i <= 6; i++) {
-            GameObject pObj = Instantiate(playerPrefab);
-            PlayerController pc = pObj.GetComponent<PlayerController>();
-            pc.playerId = i;
-            players.Add(pc);
+        var roomPlayers = GameDataManager.Instance?.roomPlayers;
+        if (roomPlayers != null && roomPlayers.Count > 0) {
+            foreach (var info in roomPlayers) {
+                GameObject pObj = Instantiate(playerPrefab);
+                PlayerController pc = pObj.GetComponent<PlayerController>();
+                pc.playerId   = info.playerId;
+                pc.playerName = info.playerName;
+                pc.colorIndex = info.colorIndex;
+                pc.isAI       = info.isAI;
+                players.Add(pc);
+            }
+        } else {
+            // 没有房间数据时回退到默认6玩家（编辑器直接运行主场景用）
+            for (int i = 1; i <= 6; i++) {
+                GameObject pObj = Instantiate(playerPrefab);
+                PlayerController pc = pObj.GetComponent<PlayerController>();
+                pc.playerId = i;
+                players.Add(pc);
+            }
         }
     }
 

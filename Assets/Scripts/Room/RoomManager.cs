@@ -210,10 +210,9 @@ public class RoomManager : MonoBehaviour {
     }
 
     public void ExecuteNetStartGame() {
-        // TODO: 将房间数据写入 GameDataManager，然后切主场景
-        // GameDataManager.Instance.SetupFromRoom(slots, roundCount);
-        // UnityEngine.SceneManagement.SceneManager.LoadScene("MainGameScene");
-        Debug.Log("[RoomManager] 游戏开始！（TODO: 切场景）");
+        if (GameDataManager.Instance != null)
+            GameDataManager.Instance.SetupFromRoom(slots, roundCount);
+        UnityEngine.SceneManagement.SceneManager.LoadScene("MainGameScene");
     }
 
     public void ExecuteNetDisband() {

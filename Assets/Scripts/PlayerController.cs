@@ -4,6 +4,9 @@ using System.Collections.Generic;
 
 public class PlayerController : MonoBehaviour {
     public int playerId;
+    [HideInInspector] public string playerName;
+    [HideInInspector] public int colorIndex;
+    [HideInInspector] public bool isAI;
     public float moveSpeed = 5f;
     public float rotationSpeed = 10f;
     
