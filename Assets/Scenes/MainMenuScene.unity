@@ -1022,6 +1022,73 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 180}
   m_SizeDelta: {x: 200, y: 60}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!1 &902394773
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 902394775}
+  - component: {fileID: 902394774}
+  m_Layer: 0
+  m_Name: GameDataManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &902394774
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 902394773}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2b0f55488fc314e918f216a236a9c7b5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  database: {fileID: 11400000, guid: 092ab140f149d4dd5819dbc2c67c4cf3, type: 2}
+  savedPlayers: []
+  savedGrids: []
+  allPossibleCards:
+  - {fileID: 11400000, guid: 228f94ba9c8cf4f348fbd92cd5aa3d57, type: 2}
+  - {fileID: 11400000, guid: fa9dc0e8294af4955bd9f7b2db57742d, type: 2}
+  barricadePrefab: {fileID: 1888194853599230624, guid: 3146f86dda80d419d969f57748e67a14, type: 3}
+  housePrefab: {fileID: 1319817351213823019, guid: 399cdef97dd5449baa1d93490c2042f3, type: 3}
+  iceEffectPrefab: {fileID: 1417109416525264207, guid: 6cb037c5634ee4110bc07fc9015edd66, type: 3}
+  smokeEffectPrefab: {fileID: 4360349100514087828, guid: 5af978f9b85b89f4b8c026caf85fe44b, type: 3}
+  shopPrefab: {fileID: 1319817351213823019, guid: 399cdef97dd5449baa1d93490c2042f3, type: 3}
+  hospitalPrefab: {fileID: 1319817351213823019, guid: 399cdef97dd5449baa1d93490c2042f3, type: 3}
+  bankPrefab: {fileID: 1319817351213823019, guid: 399cdef97dd5449baa1d93490c2042f3, type: 3}
+  prisonPrefab: {fileID: 1319817351213823019, guid: 399cdef97dd5449baa1d93490c2042f3, type: 3}
+  dropHeight: 15
+  roomPlayers: []
+  roomRoundCount: 5
+  pendingRoomAction: 0
+  pendingRoomCode: 
+  pendingPlayerName: "\u73A9\u5BB61"
+  minigameRanking: 
+  minigameScenes:
+  - Minigame_BlockStack
+--- !u!4 &902394775
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 902394773}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 257, y: 553, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1020012775
 GameObject:
   m_ObjectHideFlags: 0
@@ -3062,6 +3129,51 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &2098683094
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2098683096}
+  - component: {fileID: 2098683095}
+  m_Layer: 0
+  m_Name: WebSocketManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &2098683095
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2098683094}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c9302110a3d4840459e5794b29fe5866, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  serverUrl: ws://localhost:3000
+--- !u!4 &2098683096
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2098683094}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 257, y: 553, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -3070,3 +3182,5 @@ SceneRoots:
   - {fileID: 1867810925}
   - {fileID: 222385997}
   - {fileID: 2065963458}
+  - {fileID: 2098683096}
+  - {fileID: 902394775}

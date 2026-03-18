@@ -36,7 +36,24 @@ public class RoomUI : MonoBehaviour {
         if (roundsMinusBtn != null) roundsMinusBtn.onClick.AddListener(() => RoomManager.Instance?.RequestSetRounds(-1));
         if (roundsPlusBtn  != null) roundsPlusBtn.onClick.AddListener(() => RoomManager.Instance?.RequestSetRounds(1));
 
-        // 根据主菜单传入的 pending action 决定创建或加入
+        var ws = WebSocketManager.Instance;
+        if (ws != null && ws.IsConnected)
+            SendRoomInitRequest();
+        else if (ws != null)
+            ws.OnConnected += SendRoomInitRequest;
+        else
+            SendRoomInitRequest(); // 无网络，走本地回退
+    }
+
+    void OnDestroy() {
+        if (WebSocketManager.Instance != null)
+            WebSocketManager.Instance.OnConnected -= SendRoomInitRequest;
+    }
+
+    void SendRoomInitRequest() {
+        if (WebSocketManager.Instance != null)
+            WebSocketManager.Instance.OnConnected -= SendRoomInitRequest;
+
         var gdm = GameDataManager.Instance;
         string playerName = gdm != null ? gdm.pendingPlayerName : "玩家1";
         if (gdm == null || gdm.pendingRoomAction == PendingRoomAction.CreateRoom)

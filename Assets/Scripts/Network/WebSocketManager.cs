@@ -22,6 +22,8 @@ public class WebSocketManager : MonoBehaviour {
 
     public bool IsConnected => _ws?.State == WebSocketState.Open;
 
+    public event Action OnConnected;
+
     void Awake() {
         if (Instance == null) {
             Instance = this;
@@ -37,7 +39,7 @@ public class WebSocketManager : MonoBehaviour {
         if (_ws != null && _ws.State == WebSocketState.Open) return;
 
         _ws = new WebSocket(serverUrl);
-        _ws.OnOpen    += () => Debug.Log("[WS] Connected: " + serverUrl);
+        _ws.OnOpen    += () => { Debug.Log("[WS] Connected: " + serverUrl); OnConnected?.Invoke(); };
         _ws.OnError   += (e) => Debug.LogError("[WS] Error: " + e);
         _ws.OnClose   += (e) => Debug.Log("[WS] Closed: " + e);
         _ws.OnMessage += OnRawMessage;
