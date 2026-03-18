@@ -34,7 +34,6 @@ public class PlayerSlotUI : MonoBehaviour {
     int _slotIndex;
 
     void Awake() {
-        Debug.Log($"[PlayerSlotUI] Awake {gameObject.name} colorLeftBtn={colorLeftBtn} colorRightBtn={colorRightBtn}");
         nameInput?.onEndEdit.AddListener(OnNameEndEdit);
         addAIButton?.onClick.AddListener(OnAddAIClicked);
         colorLeftBtn?.onClick.AddListener(OnColorLeftClicked);
@@ -101,21 +100,13 @@ public class PlayerSlotUI : MonoBehaviour {
         if (kickButton != null)
             kickButton.gameObject.SetActive(iAmHost && !isMe);
 
-        if (colorLeftBtn != null)
-            Debug.Log($"[PlayerSlotUI] SetData slot={_slotIndex} colorLeftBtn active={colorLeftBtn.gameObject.activeSelf} activeInHierarchy={colorLeftBtn.gameObject.activeInHierarchy} interactable={colorLeftBtn.interactable}");
     }
 
     // ── 按钮回调（Inspector OnClick 或 Awake AddListener）──
 
     public void OnAddAIClicked()     => RoomManager.Instance?.RequestAddAI(_slotIndex);
-    public void OnColorLeftClicked() {
-        Debug.Log($"[PlayerSlotUI] OnColorLeftClicked slotIndex={_slotIndex} RoomManager={RoomManager.Instance}");
-        RoomManager.Instance?.RequestCycleColor(-1, _slotIndex);
-    }
-    public void OnColorRightClicked() {
-        Debug.Log($"[PlayerSlotUI] OnColorRightClicked slotIndex={_slotIndex} RoomManager={RoomManager.Instance}");
-        RoomManager.Instance?.RequestCycleColor(1, _slotIndex);
-    }
+    public void OnColorLeftClicked()  => RoomManager.Instance?.RequestCycleColor(-1, _slotIndex);
+    public void OnColorRightClicked() => RoomManager.Instance?.RequestCycleColor(1,  _slotIndex);
     public void OnReadyClicked()     => RoomManager.Instance?.RequestToggleReady();
     public void OnKickClicked()      => RoomManager.Instance?.RequestKickSlot(_slotIndex);
     void OnNameEndEdit(string newName) => RoomManager.Instance?.RequestUpdateName(newName);

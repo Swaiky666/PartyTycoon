@@ -108,25 +108,19 @@ public class RoomManager : MonoBehaviour {
     /// <param name="targetSlot">目标槽位（-1 表示本地玩家自己的槽）</param>
     public void RequestCycleColor(int direction, int targetSlot = -1) {
         int slot = (targetSlot >= 0) ? targetSlot : localSlotIndex;
-        Debug.Log($"[RoomManager] RequestCycleColor dir={direction} targetSlot={targetSlot} → slot={slot} state={slots[slot].state} localSlot={localSlotIndex}");
 
         // 只有自己的槽或AI槽可以操作
-        if (slots[slot].state == SlotState.Human && slot != localSlotIndex) {
-            Debug.Log("[RoomManager] RequestCycleColor BLOCKED: 他人Human槽");
-            return;
-        }
+        if (slots[slot].state == SlotState.Human && slot != localSlotIndex) return;
 
         int current     = slots[slot].colorIndex;
         int next        = current;
         var takenColors = GetTakenColors(slot);
-        Debug.Log($"[RoomManager] 当前colorIndex={current} playerId={slots[slot].playerId} takenColors=[{string.Join(",", takenColors)}]");
 
         int colorCount = PlayerColors.Length;
         for (int i = 0; i < colorCount; i++) {
             next = (next + direction + colorCount) % colorCount;
             if (!takenColors.Contains(next)) break;
         }
-        Debug.Log($"[RoomManager] 切换到colorIndex={next} RoomNetworkManager={RoomNetworkManager.Instance}");
 
         if (RoomNetworkManager.Instance != null)
             RoomNetworkManager.Instance.SendRoomUpdateColorRequest(slots[slot].playerId, next);
@@ -204,7 +198,6 @@ public class RoomManager : MonoBehaviour {
 
     public void ExecuteNetUpdateColor(int playerId, int colorIndex) {
         int idx = FindSlotByPlayerId(playerId);
-        Debug.Log($"[RoomManager] ExecuteNetUpdateColor playerId={playerId} colorIndex={colorIndex} idx={idx}");
         if (idx < 0) return;
         slots[idx].colorIndex = colorIndex;
         RoomUI.Instance?.RefreshSlot(idx);
@@ -251,8 +244,7 @@ public class RoomManager : MonoBehaviour {
     }
 
     public void ExecuteNetDisband() {
-        // TODO: 返回主菜单
-        Debug.Log("[RoomManager] 房间已解散（TODO: 返回主菜单）");
+        UnityEngine.SceneManagement.SceneManager.LoadScene("MainMenuScene");
     }
 
     public void ExecuteNetLeave(int playerId) {
