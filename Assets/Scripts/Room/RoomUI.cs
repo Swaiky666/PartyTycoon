@@ -36,8 +36,13 @@ public class RoomUI : MonoBehaviour {
         if (roundsMinusBtn != null) roundsMinusBtn.onClick.AddListener(() => RoomManager.Instance?.RequestSetRounds(-1));
         if (roundsPlusBtn  != null) roundsPlusBtn.onClick.AddListener(() => RoomManager.Instance?.RequestSetRounds(1));
 
-        // 以房主身份初始化房间（真联网阶段改为从服务端获取房间状态）
-        RoomManager.Instance?.InitAsHost();
+        // 根据主菜单传入的 pending action 决定创建或加入
+        var gdm = GameDataManager.Instance;
+        string playerName = gdm != null ? gdm.pendingPlayerName : "玩家1";
+        if (gdm == null || gdm.pendingRoomAction == PendingRoomAction.CreateRoom)
+            RoomManager.Instance?.RequestCreateRoom(playerName);
+        else
+            RoomManager.Instance?.RequestJoinRoom(gdm.pendingRoomCode, playerName);
     }
 
     // ── 刷新 ──────────────────────────────────────────────

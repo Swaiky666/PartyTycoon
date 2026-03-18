@@ -9,6 +9,9 @@
       "Bash(curl -s https://raw.githubusercontent.com/R-zine/stackr/main/package.json)",
       "Read(//private/tmp/TrickyTower/**)",
       "Read(//tmp/TrickyTower/**)"
+    ],
+    "additionalDirectories": [
+      "/Users/liuweiqi/Documents/GitHub/PartyTycoon"
     ]
   }
 }

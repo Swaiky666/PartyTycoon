@@ -2,6 +2,8 @@ using UnityEngine;
 using System.Collections.Generic;
 using UnityEngine.SceneManagement;
 
+public enum PendingRoomAction { CreateRoom, JoinRoom }
+
 [System.Serializable]
 public class RoomPlayerInfo {
     public int playerId;
@@ -56,8 +58,12 @@ public class GameDataManager : MonoBehaviour {
     public float dropHeight = 15f;
 
     [Header("房间配置（开局前写入）")]
-    [HideInInspector] public List<RoomPlayerInfo> roomPlayers = new List<RoomPlayerInfo>();
-    [HideInInspector] public int roomRoundCount = 5;
+    [HideInInspector] public List<RoomPlayerInfo> roomPlayers   = new List<RoomPlayerInfo>();
+    [HideInInspector] public int    roomRoundCount  = 5;
+    // 跨场景传参：主菜单 → 房间场景
+    [HideInInspector] public PendingRoomAction pendingRoomAction = PendingRoomAction.CreateRoom;
+    [HideInInspector] public string pendingRoomCode   = "";
+    [HideInInspector] public string pendingPlayerName = "玩家1";
 
     [Header("小游戏结算")]
     [Tooltip("小游戏完成名次（按顺序存 playerId），由 TetrisGameController 写入")]

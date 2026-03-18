@@ -43,7 +43,8 @@ public class MainMenuUI : MonoBehaviour {
     // ── 主按钮回调 ────────────────────────────────────────
 
     void OnHostClicked() {
-        // 进入房间场景，以房主身份初始化（RoomUI.Start 调用 InitAsHost）
+        if (GameDataManager.Instance != null)
+            GameDataManager.Instance.pendingRoomAction = PendingRoomAction.CreateRoom;
         SceneManager.LoadScene("RoomScene");
     }
 
@@ -73,9 +74,10 @@ public class MainMenuUI : MonoBehaviour {
             Debug.Log("[MainMenuUI] 房间码长度不对: " + code);
             return;
         }
-        // TODO: 真联网阶段：发送请求加入房间（带 code）→ 服务端验证 → 跳转 RoomScene
-        // 当前直接跳转 RoomScene，RoomUI 需根据 isLocalHost=false 初始化
-        Debug.Log("[MainMenuUI] 加入房间: " + code + "（TODO: 联网验证）");
+        if (GameDataManager.Instance != null) {
+            GameDataManager.Instance.pendingRoomAction = PendingRoomAction.JoinRoom;
+            GameDataManager.Instance.pendingRoomCode   = code;
+        }
         SceneManager.LoadScene("RoomScene");
     }
 

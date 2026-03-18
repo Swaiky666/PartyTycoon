@@ -32,31 +32,65 @@ public class RoomManager : MonoBehaviour {
         for (int i = 0; i < 6; i++) slots[i] = new SlotData(i);
     }
 
-    // ── 初始化 ────────────────────────────────────────────
+    // ── 初始化（联网）────────────────────────────────────────
 
-    /// <summary>以房主身份初始化房间（本地测试：玩家0入驻槽0）</summary>
-    public void InitAsHost() {
-        localPlayerId  = 0;
-        localSlotIndex = 0;
-        isLocalHost    = true;
-        roomCode       = GenerateRoomCode();
+    /// <summary>向服务端发送创建房间请求。</summary>
+    public void RequestCreateRoom(string playerName) {
+        if (RoomNetworkManager.Instance != null)
+            RoomNetworkManager.Instance.SendCreateRoom(playerName);
+        else
+            InitAsHostLocal(playerName); // 无网络时本地回退
+    }
 
-        slots[0].state      = SlotState.Human;
-        slots[0].playerId   = 0;
-        slots[0].playerName = "玩家1";
-        slots[0].colorIndex = 0;
-        slots[0].isReady    = true;  // 房主无需手动准备
-        slots[0].isHost     = true;
+    /// <summary>向服务端发送加入房间请求。</summary>
+    public void RequestJoinRoom(string code, string playerName) {
+        if (RoomNetworkManager.Instance != null)
+            RoomNetworkManager.Instance.SendJoinRoom(code, playerName);
+        else
+            Debug.LogWarning("[RoomManager] 无网络，无法加入房间");
+    }
 
+    /// <summary>
+    /// [服务端广播] 本客户端成功创建或加入房间，写入本地身份信息并刷新 UI。
+    /// </summary>
+    public void ExecuteNetRoomInit(string serverRoomCode, int playerId, int slotIndex, SlotData[] serverSlots, int serverRoundCount, bool isHost) {
+        localPlayerId  = playerId;
+        localSlotIndex = slotIndex;
+        isLocalHost    = isHost;
+        roomCode       = serverRoomCode;
+        roundCount     = serverRoundCount;
+        ApplyServerSlots(serverSlots);
         RoomUI.Instance?.RefreshAll();
     }
 
-    static string GenerateRoomCode() {
-        const string chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-        string code = "";
-        for (int i = 0; i < 6; i++)
-            code += chars[Random.Range(0, chars.Length)];
-        return code;
+    /// <summary>[服务端广播] 整体槽位状态刷新（有人加入/离开/被踢/添加AI）。</summary>
+    public void ExecuteNetFullSlotsUpdate(SlotData[] serverSlots) {
+        ApplyServerSlots(serverSlots);
+        RoomUI.Instance?.RefreshAll();
+    }
+
+    void ApplyServerSlots(SlotData[] serverSlots) {
+        if (serverSlots == null) return;
+        for (int i = 0; i < serverSlots.Length && i < slots.Length; i++)
+            slots[i] = serverSlots[i];
+    }
+
+    // ── 本地回退（无服务端时） ────────────────────────────────
+
+    void InitAsHostLocal(string playerName) {
+        localPlayerId  = 0;
+        localSlotIndex = 0;
+        isLocalHost    = true;
+        roomCode       = "LOCAL";
+
+        slots[0].state      = SlotState.Human;
+        slots[0].playerId   = 0;
+        slots[0].playerName = playerName;
+        slots[0].colorIndex = 0;
+        slots[0].isReady    = true;
+        slots[0].isHost     = true;
+
+        RoomUI.Instance?.RefreshAll();
     }
 
     // ── 玩家操作 ──────────────────────────────────────────
@@ -142,7 +176,7 @@ public class RoomManager : MonoBehaviour {
         if (RoomNetworkManager.Instance != null)
             RoomNetworkManager.Instance.SendRoomStartRequest();
         else
-            ExecuteNetStartGame();
+            ExecuteNetStartGame(slots, roundCount);
     }
 
     public void RequestLeaveOrDisband() {
@@ -209,9 +243,10 @@ public class RoomManager : MonoBehaviour {
         RoomUI.Instance?.RefreshSettings();
     }
 
-    public void ExecuteNetStartGame() {
+    public void ExecuteNetStartGame(SlotData[] serverSlots, int serverRoundCount) {
+        if (serverSlots != null) ApplyServerSlots(serverSlots);
         if (GameDataManager.Instance != null)
-            GameDataManager.Instance.SetupFromRoom(slots, roundCount);
+            GameDataManager.Instance.SetupFromRoom(slots, serverRoundCount);
         UnityEngine.SceneManagement.SceneManager.LoadScene("MainGameScene");
     }
 

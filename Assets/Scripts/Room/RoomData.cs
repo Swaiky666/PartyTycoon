@@ -10,6 +10,8 @@ public class SlotData {
     public bool   isReady     = false;
     public bool   isHost      = false;
 
+    public SlotData() { }  // JsonUtility 反序列化用
+
     public SlotData(int index) {
         slotIndex  = index;
         playerName = "玩家" + (index + 1);
